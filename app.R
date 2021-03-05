@@ -1,37 +1,24 @@
-library(shiny)
-library(DT)
-library(plotly)
-library(ggplot2)
-library(SummarizedExperiment)
-library(DESeq2)
-library(enrichR)
-library(heatmaply)
-library(shinyjs)
-library(STRINGdb)
-library(reshape2)
-library(BiocManager)
-
-library(omiicsRNAseq)
-
 options(error=function()traceback(2))
 options(shiny.maxRequestSize = 100*1024^2)
 
 
-# if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
-# requiredpackages <- c("heatmaply","edgeR",'enrichR',"ggrepel","DT","ExpressionAtlas","STRINGdb","scales","DESeq2","affy","shinyjs","reshape2","gtools","orca")
-#
-# install_load <- function(packages){
-#   for (p in packages) {
-#     if (p %in% rownames(installed.packages())) {
-#       library(p, character.only=TRUE)
-#     } else {
-#       BiocManager::install(p)
-#       library(p,character.only = TRUE)
-#     }
-#   }
-# }
-# install_load(requiredpackages)
+if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
+requiredpackages <- c("heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca")
 
+ install_load <- function(packages){
+   for (p in packages) {
+     if (p %in% rownames(installed.packages())) {
+       library(p, character.only=TRUE)
+     } else {
+       BiocManager::install(p)
+       library(p,character.only = TRUE)
+     }
+  }
+}
+install_load(requiredpackages)
+        
+install_github("https://github.com/MathiasBryggerHansen/omiics_rnaseq.git",repos = BiocManager::repositories())
+        
 server <- function(input, output) {
 
   ##########################################
