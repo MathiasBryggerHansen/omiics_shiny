@@ -17,7 +17,7 @@ requiredpackages <- c("heatmaply","STRINGdb","scales","affy","shinyjs","reshape2
 }
 install_load(requiredpackages)
         
-install_github("https://github.com/MathiasBryggerHansen/omiics_rnaseq.git",repos = BiocManager::repositories())
+install_github("https://github.com/MathiasBryggerHansen/omiics_rnaseq.git",repos = BiocManager::repositories(), force = TRUE)
 library(omiicsRNAseq)       
 server <- function(input, output) {
 
