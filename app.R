@@ -68,9 +68,9 @@ server <- function(input, output) {
       }
 
       if(input[[paste0("raw_counts",i)]]){
+        showNotification("esf")
         res[[toString(i)]] <- count2deseq_analysis(input, countdata = counts, pheno = pheno)
       }
-      showNotification("esf")
       else {
         d0 <- DGEList(assays(temp)$counts)
         if(input$gene_filter){
