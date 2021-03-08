@@ -183,6 +183,7 @@ server <- function(input, output) {
   # })
 
   output$fileInputs <- renderUI({
+    print("reading files...")
     html_ui = " "
     for (i in 1:input$nfiles){#checkboxInput(inputId = paste0("CEL",i), label="Is CEL", FALSE),
       html_ui <- paste0(html_ui, fileInput(paste0("count",i), label=paste0("count data ",i)), fileInput(paste0("phenotype",i),
