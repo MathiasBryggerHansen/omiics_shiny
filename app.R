@@ -3,7 +3,7 @@ options(shiny.maxRequestSize = 100*1024^2)
 
 
 if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
-requiredpackages <- c("heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca","devtools")
+requiredpackages <- c("heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca","devtools","SummarizedExperiment")
 
  install_load <- function(packages){
    for (p in packages) {
@@ -16,9 +16,9 @@ requiredpackages <- c("heatmaply","STRINGdb","scales","affy","shinyjs","reshape2
   }
 }
 install_load(requiredpackages)
-        
+
 install_github("https://github.com/MathiasBryggerHansen/omiics_rnaseq.git",repos = BiocManager::repositories(), force = TRUE)
-library(omiicsRNAseq)       
+library(omiicsRNAseq)
 server <- function(input, output) {
 
   ##########################################
