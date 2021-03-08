@@ -20,7 +20,7 @@ install_load(requiredpackages)
 install_github("https://github.com/MathiasBryggerHansen/omiics_rnaseq.git",repos = BiocManager::repositories())
 library(omiicsRNAseq)
 server <- function(input, output) {
-  print("loading data")
+  showNotification("loading data")
   ##########################################
   ##Load annotation data
   pathway_dic <- reactive(readRDS(file = paste0("data/gene_dic_",input$species,".RDS")))
@@ -32,7 +32,7 @@ server <- function(input, output) {
   string_db <- reactive(STRINGdb$new( version="11",score_threshold=200, input_directory="",species = stringdb_id[[input$species]]))
   #translate from ensembl to other gene ids
   ensembl2id <- reactive(return(readRDS(paste0("data/id_table_",input$species,".RDS"))))
-  print("loading done")
+  showNotification("loading done")
 
   ###########################################
   ##Global variables + helper functions
@@ -43,7 +43,7 @@ server <- function(input, output) {
 
   #Runs count2deseq_analysis() or limma_analysis() for the data inputs.
   gene_results_de <- reactive({
-    print("gr1")
+    showNotification("gr1")
     req(input_data$inp)
     res <- list()
     files <- input_data$inp
@@ -83,7 +83,7 @@ server <- function(input, output) {
         res[[toString(i)]] <- limma_analysis(countdata = temp,phenotypes = pheno[[1]],design = mm)
       }
     }
-    print("gr2")
+    showNotification("gr2")
     return(res)
   })
 
@@ -183,7 +183,7 @@ server <- function(input, output) {
   # })
 
   output$fileInputs <- renderUI({
-    print("reading files...")
+    showNotification("reading files...")
     html_ui = " "
     for (i in 1:input$nfiles){#checkboxInput(inputId = paste0("CEL",i), label="Is CEL", FALSE),
       html_ui <- paste0(html_ui, fileInput(paste0("count",i), label=paste0("count data ",i)), fileInput(paste0("phenotype",i),
@@ -267,7 +267,7 @@ server <- function(input, output) {
   # })
   gene_results <- reactive({##gene_symbol
     req(gene_results_de())
-    print("gene_results_de --> annotate")
+    showNotification("gene_results_de --> annotate")
     data <- gene_results_de()[["1"]][["test"]]##c("padj",multiple "log2FoldChange","baseMean","pvalue","stat","lfcSE")
     return(annotate_results(input = input, data = data, ensembl2id = ensembl2id(), pathway_dic = pathway_dic(), circ=F))
   })
@@ -512,7 +512,7 @@ server <- function(input, output) {
   })
 
   output$volcano <- renderPlotly({
-    print("volcano")
+    showNotification("volcano")
     req(gene_results_filtered(), eval(parse(text = input$p))<p_max)
     colnames(gene_results_filtered())
     volcano_plot(input = input, data = gene_results_filtered(), pathway_dic = pathway_dic())})
@@ -577,7 +577,7 @@ server <- function(input, output) {
   })
 
   output$pca <- renderPlotly({
-    print("pca")
+    showNotification("pca")
     req(gene_results_de())
     if(input[["raw_counts1"]]){
       data_norm <- gene_results_de()[["1"]][["dds"]]
@@ -613,7 +613,7 @@ server <- function(input, output) {
           height = 1000
         )
       )
-    print("pca2")
+    showNotification("pca2")
   })
 
   output$gene_results_title <- renderUI({
@@ -631,7 +631,7 @@ server <- function(input, output) {
 
   output$gene_results_table <- renderDataTable({
     req(gene_results())
-    print("genetable")
+    showNotification("genetable")
     datatable(data = gene_results_2(),caption = "DE results including any extra datasets",filter = list(position = 'top'),escape = F, options = list(autoWidth = TRUE,scrollX = TRUE, columnDefs = list(list(width = '400px', targets = grep(colnames(gene_data$df),pattern = "reactome|kegg|carta|wiki")))))
   })
 
