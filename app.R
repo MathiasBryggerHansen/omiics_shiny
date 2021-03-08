@@ -43,6 +43,7 @@ server <- function(input, output) {
 
   #Runs count2deseq_analysis() or limma_analysis() for the data inputs.
   gene_results_de <- reactive({
+    print("gr1")
     req(input_data$inp)
     res <- list()
     files <- input_data$inp
@@ -82,6 +83,7 @@ server <- function(input, output) {
         res[[toString(i)]] <- limma_analysis(countdata = temp,phenotypes = pheno[[1]],design = mm)
       }
     }
+    print("gr2")
     return(res)
   })
 
