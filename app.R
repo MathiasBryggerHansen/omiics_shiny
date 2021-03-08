@@ -47,12 +47,15 @@ server <- function(input, output) {
     req(input_data$inp)
     res <- list()
     files <- input_data$inp
+
     for (i in 1:input$nfiles){
       counts <- files[[paste0("count",i)]]
       pheno <- files[[paste0("pheno",i)]]
       circ <- files[[paste0("circRNA",i)]]
       pheno[[2]] <- NULL
+      showNotification(paste(pheno))
       ids <- row.names(counts)
+      showNotification(paste(ids[1]))
       if(!grepl(ids[1],pattern = "ENS")){
         ids <- probe_library()$ensembl_gene_id[match(x = ids, probe_library()$probe)]
       }
