@@ -55,12 +55,13 @@ server <- function(input, output) {
       circ <- files[[paste0("circRNA",i)]]
       showNotification("gr1d")
       pheno[[2]] <- NULL
-      showNotification(paste(pheno))
+      showNotification("kjhbv")
       ids <- row.names(counts)
       showNotification(paste(ids[1]))
       if(!grepl(ids[1],pattern = "ENS")){
         ids <- probe_library()$ensembl_gene_id[match(x = ids, probe_library()$probe)]
       }
+      showNotification("kjhersggrsgrswha")
       row.names(counts) <- make.names(ids,unique = T)
       if(!is.null(circ)){
         res[[paste0("circRNA",toString(i))]] <- de_circ(data = circ,pheno = pheno,i = i)
@@ -69,6 +70,7 @@ server <- function(input, output) {
       if(input[[paste0("raw_counts",i)]]){
         res[[toString(i)]] <- count2deseq_analysis(input, countdata = counts, pheno = pheno)
       }
+      showNotification("esf")
       else {
         d0 <- DGEList(assays(temp)$counts)
         if(input$gene_filter){
