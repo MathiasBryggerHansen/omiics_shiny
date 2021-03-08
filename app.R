@@ -20,7 +20,7 @@ install_load(requiredpackages)
 install_github("https://github.com/MathiasBryggerHansen/omiics_rnaseq.git",repos = BiocManager::repositories())
 library(omiicsRNAseq)
 server <- function(input, output) {
-
+  print("loading data")
   ##########################################
   ##Load annotation data
   pathway_dic <- reactive(readRDS(file = paste0("data/gene_dic_",input$species,".RDS")))
@@ -32,7 +32,7 @@ server <- function(input, output) {
   string_db <- reactive(STRINGdb$new( version="11",score_threshold=200, input_directory="",species = stringdb_id[[input$species]]))
   #translate from ensembl to other gene ids
   ensembl2id <- reactive(return(readRDS(paste0("data/id_table_",input$species,".RDS"))))
-
+  print("loading done")
 
   ###########################################
   ##Global variables + helper functions
@@ -1096,7 +1096,6 @@ server <- function(input, output) {
 }
 
 ui <- fluidPage(
-
   titlePanel("Omiics NGS Analysis"),
   sidebarLayout(
     sidebarPanel(
