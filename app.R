@@ -3,7 +3,7 @@ options(shiny.maxRequestSize = 100*1024^2)
 
 
 if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
-requiredpackages <- c("heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca","devtools","SummarizedExperiment","enrichR","DT","DESeq2")
+requiredpackages <- c("heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca","devtools","SummarizedExperiment","enrichR","DT","DESeq2","scales")
 
 install_load <- function(packages){
    for (p in packages) {
@@ -264,6 +264,7 @@ server <- function(input, output) {
   # })
   gene_results <- reactive({##gene_symbol
     req(gene_results_de())
+    print("gene_results_de --> annotate")
     data <- gene_results_de()[["1"]][["test"]]##c("padj",multiple "log2FoldChange","baseMean","pvalue","stat","lfcSE")
     return(annotate_results(input = input, data = data, ensembl2id = ensembl2id(), pathway_dic = pathway_dic(), circ=F))
   })
@@ -452,7 +453,7 @@ server <- function(input, output) {
     gene_filtered <- gene_results()[gene_results()$padj < eval(parse(text = input$p)) & !is.na(gene_results()$padj) & abs(gene_results()$log2FoldChange) > log2(input$fc),]
     gene_filtered <- gene_filtered[!is.na(gene_filtered$gene_symbol),]
     mapped <- string_db()$map( gene_filtered, "gene_symbol", removeUnmappedRows = TRUE ) #maybe problem to only use a subset of genes, maybe should be ordered to be sure
-    pal <- scales::gradient_n_pal(colours = c("blue","grey","red"),values= c(min(mapped$log2FoldChange), mean(mapped$log2FoldChange), max(mapped$log2FoldChange)))
+    pal <- gradient_n_pal(colours = c("blue","grey","red"),values= c(min(mapped$log2FoldChange), mean(mapped$log2FoldChange), max(mapped$log2FoldChange)))
     payload_id <- string_db()$post_payload(mapped$STRING_id,colors=pal(gene_filtered$log2FoldChange))
     hits <- mapped$STRING_id
     return(list(string_db = string_db(), payload_id = payload_id, hits = hits))
@@ -508,6 +509,7 @@ server <- function(input, output) {
   })
 
   output$volcano <- renderPlotly({
+    print("volcano")
     req(gene_results_filtered(), eval(parse(text = input$p))<p_max)
     colnames(gene_results_filtered())
     volcano_plot(input = input, data = gene_results_filtered(), pathway_dic = pathway_dic())})
@@ -572,6 +574,7 @@ server <- function(input, output) {
   })
 
   output$pca <- renderPlotly({
+    print("pca")
     req(gene_results_de())
     if(input[["raw_counts1"]]){
       data_norm <- gene_results_de()[["1"]][["dds"]]
@@ -607,6 +610,7 @@ server <- function(input, output) {
           height = 1000
         )
       )
+    print("pca2")
   })
 
   output$gene_results_title <- renderUI({
@@ -624,6 +628,7 @@ server <- function(input, output) {
 
   output$gene_results_table <- renderDataTable({
     req(gene_results())
+    print("genetable")
     datatable(data = gene_results_2(),caption = "DE results including any extra datasets",filter = list(position = 'top'),escape = F, options = list(autoWidth = TRUE,scrollX = TRUE, columnDefs = list(list(width = '400px', targets = grep(colnames(gene_data$df),pattern = "reactome|kegg|carta|wiki")))))
   })
 
