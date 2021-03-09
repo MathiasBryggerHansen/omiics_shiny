@@ -56,10 +56,6 @@ server <- function(input, output) {
       circ <- files[[paste0("circRNA",i)]]
       pheno[[2]] <- NULL
       ids <- row.names(counts)
-      cat(file=stderr(), colnames(counts))
-
-      #print(head(counts))
-      cat(file=stderr(), probe_library()$ensembl_gene_id[1:5])
 
       if(!grepl(ids[1],pattern = "ENS")){
         cat(file=stderr(), "!grepl(ids[1],pattern = ENS")
@@ -601,7 +597,6 @@ server <- function(input, output) {
     df_pca  <- prcomp(t(data_norm),scale = T, center = T)
     df_out <- as.data.frame(df_pca$x)
     scores <- df_pca$x
-    print(head(scores))
     if(input$pca_pheno > nrow(pheno)){
       showNotification("You need to specify a valid column number",type = "message")
       ann <- pheno[[1]]
