@@ -47,9 +47,9 @@ server <- function(input, output) {
     req(input_data$inp)
     res <- list()
     files <- input_data$inp
-    showNotification("gr1b")
+    #showNotification("gr1b")
     for (i in 1:input$nfiles){
-      showNotification("gr1c")
+      #showNotification("gr1c")
       counts <- files[[paste0("count",i)]]
       pheno <- files[[paste0("pheno",i)]]
       circ <- files[[paste0("circRNA",i)]]
@@ -57,14 +57,17 @@ server <- function(input, output) {
       pheno[[2]] <- NULL
       showNotification("kjhbv")
       ids <- row.names(counts)
-      showNotification(paste(ids[1]))
+      #showNotification(paste(ids[1]))
       cat(file=stderr(), colnames(counts))
 
       #print(head(counts))
+      cat(file=stderr(), probe_library()$ensembl_gene_id[1:5])
+
       if(!grepl(ids[1],pattern = "ENS")){
+        cat(file=stderr(), "!grepl(ids[1],pattern = ENS")
         ids <- probe_library()$ensembl_gene_id[match(x = ids, probe_library()$probe)]
       }
-      showNotification("kjhersggrsgrswha")####her
+      cat(file=stderr(),"kjhersggrsgrswha")####her
       row.names(counts) <- make.names(ids,unique = T)
       if(!is.null(circ)){
         res[[paste0("circRNA",toString(i))]] <- de_circ(data = circ,pheno = pheno,i = i)
