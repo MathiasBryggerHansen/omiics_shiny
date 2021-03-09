@@ -58,10 +58,11 @@ server <- function(input, output) {
       showNotification("kjhbv")
       ids <- row.names(counts)
       showNotification(paste(ids[1]))
+      cat(file=stderr(), head(counts))
       if(!grepl(ids[1],pattern = "ENS")){
         ids <- probe_library()$ensembl_gene_id[match(x = ids, probe_library()$probe)]
       }
-      showNotification("kjhersggrsgrswha")
+      showNotification("kjhersggrsgrswha")####her
       row.names(counts) <- make.names(ids,unique = T)
       if(!is.null(circ)){
         res[[paste0("circRNA",toString(i))]] <- de_circ(data = circ,pheno = pheno,i = i)
