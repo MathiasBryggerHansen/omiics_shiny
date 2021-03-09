@@ -7,7 +7,7 @@ requiredpackages <- c("heatmaply","STRINGdb","scales","affy","shinyjs","reshape2
 
 install_load <- function(packages){
    for (p in packages) {
-     if (p %in% rownames(installed.packages())) {
+     if (p %in% row.names(installed.packages())) {
        library(p, character.only=TRUE)
      } else {
        BiocManager::install(p)
@@ -16,11 +16,16 @@ install_load <- function(packages){
   }
 }
 install_load(requiredpackages)
+if("omiicsRNAseq" %in% row.names(installed.packages())){
+  library(omiicsRNAseq)
+} else {
+  install_github("https://github.com/MathiasBryggerHansen/omiics_rnaseq.git",repos = BiocManager::repositories())
+  library(omiicsRNAseq)
+}
 
-install_github("https://github.com/MathiasBryggerHansen/omiics_rnaseq.git",repos = BiocManager::repositories())
+
 library(omiicsRNAseq)
 server <- function(input, output) {
-  showNotification("loading data")
   ##########################################
   ##Load annotation data
   pathway_dic <- reactive(readRDS(file = paste0("data/gene_dic_",input$species,".RDS")))
@@ -32,7 +37,6 @@ server <- function(input, output) {
   string_db <- reactive(STRINGdb$new( version="11",score_threshold=200, input_directory="",species = stringdb_id[[input$species]]))
   #translate from ensembl to other gene ids
   ensembl2id <- reactive(return(readRDS(paste0("data/id_table_",input$species,".RDS"))))
-  showNotification("loading done")
 
   ###########################################
   ##Global variables + helper functions
@@ -43,21 +47,15 @@ server <- function(input, output) {
 
   #Runs count2deseq_analysis() or limma_analysis() for the data inputs.
   gene_results_de <- reactive({
-    showNotification("gr1")
     req(input_data$inp)
     res <- list()
     files <- input_data$inp
-    #showNotification("gr1b")
     for (i in 1:input$nfiles){
-      #showNotification("gr1c")
       counts <- files[[paste0("count",i)]]
       pheno <- files[[paste0("pheno",i)]]
       circ <- files[[paste0("circRNA",i)]]
-      showNotification("gr1d")
       pheno[[2]] <- NULL
-      showNotification("kjhbv")
       ids <- row.names(counts)
-      #showNotification(paste(ids[1]))
       cat(file=stderr(), colnames(counts))
 
       #print(head(counts))
@@ -74,7 +72,6 @@ server <- function(input, output) {
       }
 
       if(input[[paste0("raw_counts",i)]]){
-        showNotification("esf")
         res[[toString(i)]] <- count2deseq_analysis(input, countdata = counts, pheno = pheno)
       }
       else {
@@ -96,7 +93,6 @@ server <- function(input, output) {
         res[[toString(i)]] <- limma_analysis(countdata = temp,phenotypes = pheno[[1]],design = mm)
       }
     }
-    showNotification("gr2")
     return(res)
   })
 
@@ -196,7 +192,6 @@ server <- function(input, output) {
   # })
 
   output$fileInputs <- renderUI({
-    showNotification("reading files...")
     html_ui = " "
     for (i in 1:input$nfiles){#checkboxInput(inputId = paste0("CEL",i), label="Is CEL", FALSE),
       html_ui <- paste0(html_ui, fileInput(paste0("count",i), label=paste0("count data ",i)), fileInput(paste0("phenotype",i),
@@ -280,7 +275,6 @@ server <- function(input, output) {
   # })
   gene_results <- reactive({##gene_symbol
     req(gene_results_de())
-    showNotification("gene_results_de --> annotate")
     data <- gene_results_de()[["1"]][["test"]]##c("padj",multiple "log2FoldChange","baseMean","pvalue","stat","lfcSE")
     return(annotate_results(input = input, data = data, ensembl2id = ensembl2id(), pathway_dic = pathway_dic(), circ=F))
   })
@@ -525,7 +519,6 @@ server <- function(input, output) {
   })
 
   output$volcano <- renderPlotly({
-    showNotification("volcano")
     req(gene_results_filtered(), eval(parse(text = input$p))<p_max)
     colnames(gene_results_filtered())
     volcano_plot(input = input, data = gene_results_filtered(), pathway_dic = pathway_dic())})
@@ -590,7 +583,6 @@ server <- function(input, output) {
   })
 
   output$pca <- renderPlotly({
-    showNotification("pca")
     req(gene_results_de())
     if(input[["raw_counts1"]]){
       data_norm <- gene_results_de()[["1"]][["dds"]]
@@ -609,6 +601,7 @@ server <- function(input, output) {
     df_pca  <- prcomp(t(data_norm),scale = T, center = T)
     df_out <- as.data.frame(df_pca$x)
     scores <- df_pca$x
+    print(head(scores))
     if(input$pca_pheno > nrow(pheno)){
       showNotification("You need to specify a valid column number",type = "message")
       ann <- pheno[[1]]
@@ -626,7 +619,6 @@ server <- function(input, output) {
           height = 1000
         )
       )
-    showNotification("pca2")
   })
 
   output$gene_results_title <- renderUI({
@@ -644,7 +636,6 @@ server <- function(input, output) {
 
   output$gene_results_table <- renderDataTable({
     req(gene_results())
-    showNotification("genetable")
     datatable(data = gene_results_2(),caption = "DE results including any extra datasets",filter = list(position = 'top'),escape = F, options = list(autoWidth = TRUE,scrollX = TRUE, columnDefs = list(list(width = '400px', targets = grep(colnames(gene_data$df),pattern = "reactome|kegg|carta|wiki")))))
   })
 
