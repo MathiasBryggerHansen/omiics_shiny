@@ -1,4 +1,4 @@
-options(error=function()traceback(2))
+#error=function()traceback(2))
 options(shiny.maxRequestSize = 100*1024^2)
 
 
@@ -58,7 +58,9 @@ server <- function(input, output) {
       showNotification("kjhbv")
       ids <- row.names(counts)
       showNotification(paste(ids[1]))
-      cat(file=stderr(), head(counts))
+      cat(file=stderr(), colnames(counts))
+
+      #print(head(counts))
       if(!grepl(ids[1],pattern = "ENS")){
         ids <- probe_library()$ensembl_gene_id[match(x = ids, probe_library()$probe)]
       }
