@@ -24,6 +24,9 @@ if("omiicsRNAseq" %in% row.names(installed.packages())){
 }
 
 library(omiicsRNAseq)
+
+showNotification(R.version.string,type = "message")
+
 server <- function(input, output) {
   ##########################################
   ##Load annotation data
@@ -47,7 +50,6 @@ server <- function(input, output) {
   #Runs count2deseq_analysis() or limma_analysis() for the data inputs.
   gene_results_de <- reactive({
     cat(file = stdout(), "R version")
-
     cat(file = stdout(), R.version.string)
 
     req(input_data$inp)
