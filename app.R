@@ -25,7 +25,6 @@ if("omiicsRNAseq" %in% row.names(installed.packages())){
 
 library(omiicsRNAseq)
 
-showNotification(R.version.string,type = "message")
 
 server <- function(input, output) {
   ##########################################
@@ -167,6 +166,7 @@ server <- function(input, output) {
 
   observeEvent(input$start, {
     showNotification("Analysis will be running for some seconds...",type = "message",duration = 10)
+    showNotification(R.version.string,type = "message")
   })
 
   # output$fileInputs <- renderUI({
