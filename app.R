@@ -286,12 +286,12 @@ server <- function(input, output) {
 
   observeEvent(input$Atlas_run,{
     req(gene_results())
-    gene_data$df <- update_atlas(atlas_id = T, gene_data$df, input = input)
+    gene_data$df <- update_atlas(atlas_id = T, gene_data = gene_data$df, input = input)
   })
 
   observeEvent(input$Atlas_search, {
     req(gene_results())
-    gene_data$df <- update_atlas(gene_data$df, input = input)
+    gene_data$df <- update_atlas(gene_data = gene_data$df, input = input)
   })
 
   observeEvent(input$k_cluster_run, {
