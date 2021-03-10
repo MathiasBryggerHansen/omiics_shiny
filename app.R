@@ -22,7 +22,7 @@ if("omiicsRNAseq" %in% row.names(installed.packages())){
   install_github("https://github.com/MathiasBryggerHansen/omiics_rnaseq.git",repos = BiocManager::repositories())
   library(omiicsRNAseq)
 }
-cat(file = stdout(), R.version$version.string)
+cat(file = stdout(), R.version.string)
 
 library(omiicsRNAseq)
 server <- function(input, output) {
