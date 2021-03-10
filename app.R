@@ -34,7 +34,7 @@ server <- function(input, output) {
   probe_library <- reactive(readRDS(paste0("data/",input$species,"_probe_library.RDS")))
   stringdb_id <- list("human" = 9606, "zebrafish" = 7955, "rat" = 10116, "chicken" = 9031, "mouse" = 10090)
   ebi_id <- list("human" = "homo_sapiens","zebrafish" = "danio_rerio","rat" = "rattus_norvegicus", "chicken" = "gallus_gallus", "mouse" = "mus_musculus")
-  string_db <- reactive(STRINGdb$new( version="11",score_threshold=200, input_directory=".",species = stringdb_id[[input$species]]))#input_dir = ""
+  string_db <- reactive(STRINGdb$new( version="11",score_threshold=200, species = stringdb_id[[input$species]]))#input_dir = ""
   #translate from ensembl to other gene ids
   ensembl2id <- reactive(return(readRDS(paste0("data/id_table_",input$species,".RDS"))))
 
@@ -456,9 +456,9 @@ server <- function(input, output) {
     req(gene_results(),eval(parse(text = input$p))<p_max)#Avoid overload
     gene_filtered <- gene_results()[gene_results()$padj < eval(parse(text = input$p)) & !is.na(gene_results()$padj) & abs(gene_results()$log2FoldChange) > log2(input$fc),]
     gene_filtered <- gene_filtered[!is.na(gene_filtered$gene_symbol),]
-    cat(file = stdout(), colnames(gene_filtered))
+    #cat(file = stdout(), colnames(gene_filtered))
     mapped <- string_db()$map( gene_filtered, "gene_symbol", removeUnmappedRows = TRUE ) #maybe problem to only use a subset of genes, maybe should be ordered to be sure
-    cat(head(mapped$STRING_id))
+    cat(file = stdout(),head(mapped$STRING_id))
     pal <- gradient_n_pal(colours = c("blue","grey","red"),values= c(min(mapped$log2FoldChange), mean(mapped$log2FoldChange), max(mapped$log2FoldChange)))
     payload_id <- string_db()$post_payload(mapped$STRING_id,colors=pal(gene_filtered$log2FoldChange))
     hits <- mapped$STRING_id
