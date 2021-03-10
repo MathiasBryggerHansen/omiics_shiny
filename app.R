@@ -3,7 +3,7 @@ options(shiny.maxRequestSize = 100*1024^2)
 
 
 if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
-requiredpackages <- c("heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca","devtools","SummarizedExperiment","enrichR","DT","DESeq2","scales")
+requiredpackages <- c("digest","heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca","devtools","SummarizedExperiment","enrichR","DT","DESeq2","scales")
 
 install_load <- function(packages){
    for (p in packages) {
