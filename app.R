@@ -22,7 +22,7 @@ if("omiicsRNAseq" %in% row.names(installed.packages())){
   install_github("https://github.com/MathiasBryggerHansen/omiics_rnaseq.git",repos = BiocManager::repositories())
   library(omiicsRNAseq)
 }
-
+cat(file = stdout(), R.version$version.string)
 
 library(omiicsRNAseq)
 server <- function(input, output) {
@@ -457,7 +457,6 @@ server <- function(input, output) {
     gene_filtered <- gene_results()[gene_results()$padj < eval(parse(text = input$p)) & !is.na(gene_results()$padj) & abs(gene_results()$log2FoldChange) > log2(input$fc),]
     gene_filtered <- gene_filtered[!is.na(gene_filtered$gene_symbol),]
     #cat(file = stdout(), colnames(gene_filtered))
-    cat(file = stdout(), R.version$version.string)
     mapped <- string_db()$map( gene_filtered, "gene_symbol", removeUnmappedRows = TRUE ) #maybe problem to only use a subset of genes, maybe should be ordered to be sure
     cat(file = stdout(),head(mapped$STRING_id))
     pal <- gradient_n_pal(colours = c("blue","grey","red"),values= c(min(mapped$log2FoldChange), mean(mapped$log2FoldChange), max(mapped$log2FoldChange)))
