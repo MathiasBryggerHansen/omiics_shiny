@@ -48,9 +48,6 @@ server <- function(input, output) {
 
   #Runs count2deseq_analysis() or limma_analysis() for the data inputs.
   gene_results_de <- reactive({
-    cat(file = stdout(), "R version")
-    cat(file = stdout(), R.version.string)
-
     req(input_data$inp)
     res <- list()
     files <- input_data$inp
@@ -166,7 +163,6 @@ server <- function(input, output) {
 
   observeEvent(input$start, {
     showNotification("Analysis will be running for some seconds...",type = "message",duration = 10)
-    showNotification(R.version.string,type = "message")
   })
 
   # output$fileInputs <- renderUI({
@@ -736,7 +732,7 @@ server <- function(input, output) {
     else{
       canc_FC <- canc_FC[order(rowSums(abs(canc_FC),na.rm = T),decreasing = T)[1:100],]
     }
-    heatmaply(as.matrix(canc_FC),scale_fill_gradient_fun = scale_fill_gradient( low = input$col_low, high = input$col_high, na.value = "grey")) %>%
+    heatmaply(as.matrix(canc_FC[complete.cases(canc_FC),]),scale_fill_gradient_fun = scale_fill_gradient( low = input$col_low, high = input$col_high, na.value = "grey")) %>%
       config(
         toImageButtonOptions = list(
           format = "svg",
