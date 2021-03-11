@@ -518,6 +518,7 @@ server <- function(input, output) {
   output$volcano <- renderPlotly({
     req(gene_results_filtered(), eval(parse(text = input$p))<p_max)
     colnames(gene_results_filtered())
+    saveRDS(gene_results_filtered(), file = "volcano_data.RDS")
     volcano_plot(input = input, data = gene_results_filtered(), pathway_dic = pathway_dic())})
 
   output$volcano_title_circ <- renderUI({
@@ -605,6 +606,8 @@ server <- function(input, output) {
     else{
       ann <- pheno[[input$pca_pheno]]
     }
+    #saveRDS(scores[,1:3], file = "pca_scores")
+    saveRDS(cbind(ann,row.names(df_out)), file = "pca_ann.RDS")
     plot_ly(x=scores[,1], y=scores[,2], z=scores[,3], type = "scatter3d", mode="markers",name = row.names(df_out), color = ann) %>%
       layout(scene = list(xaxis = list(title = "PC1"), yaxis = list(title = "PC2"), zaxis = list(title = "PC3"))) %>%
       config(
@@ -632,6 +635,7 @@ server <- function(input, output) {
 
   output$gene_results_table <- renderDataTable({
     req(gene_results())
+    saveRDS(gene_results_2(), file = "gene_results_table.RDS")
     datatable(data = gene_results_2(),caption = "DE results including any extra datasets",filter = list(position = 'top'),escape = F, options = list(autoWidth = TRUE,scrollX = TRUE, columnDefs = list(list(width = '400px', targets = grep(colnames(gene_data$df),pattern = "reactome|kegg|carta|wiki")))))
   })
 
@@ -984,6 +988,7 @@ server <- function(input, output) {
     #gene_symbol[row.names(data)%in%ensembl]
     data <- data[,sample_ids]
     data <- data[apply(X = data,1, function(x) var(x)!=0),]
+    saveRDS(cor(data.frame(t(data)),method = "spearman"), file = "gene_gene.RDS")
     heatmaply(cor(data.frame(t(data)),method = "spearman"),scale_fill_gradient_fun = scale_fill_gradient(low = input$col_low, high = input$col_high)) %>%
       config(toImageButtonOptions = list(format = "svg",
                                          filename = "gene_gene_interaction",
@@ -1123,8 +1128,8 @@ ui <- fluidPage(
       checkboxInput(inputId = "chain", label = "Chain output with filtered table", value = F),
       textInput(inputId = "experiment_id", label = "Use alternative dataset for volcano plot", value = ""),
       textInput(inputId = "volcano_col", label = "A column to annotate color in volcano plot",value = "gene_biotype"),
-      textInput(inputId = "col_high", label = "Volcano color of continuous high values", value = "red"),
-      textInput(inputId = "col_low", label = "Volcano color of continuous low values", value = "blue"),
+      textInput(inputId = "col_high", label = "Color of continuous high values", value = "red"),
+      textInput(inputId = "col_low", label = "Color of continuous low values", value = "blue"),
       #checkboxInput(inputId = "pca_pheno", label = "Annotate PCA with phenotype", value = F),
       numericInput(inputId = "pca_pheno", label = "PCA annotation column", value = 1),
       checkboxInput(inputId = "log_scale", label = "Scale color values"),
