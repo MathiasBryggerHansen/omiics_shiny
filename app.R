@@ -16,12 +16,11 @@ install_load <- function(packages){
   }
 }
 install_load(requiredpackages)
-if("omiicsRNAseq" %in% row.names(installed.packages())){
-  library(omiicsRNAseq)
-} else {
-  install_github("https://github.com/MathiasBryggerHansen/omiics_rnaseq.git",repos = BiocManager::repositories())
-  library(omiicsRNAseq)
+if("omiicsRNAseq" %in% loadedNamespaces()){
+  detach("package:omiicsRNAseq", unload=TRUE)
 }
+
+install_github("https://github.com/MathiasBryggerHansen/omiics_rnaseq.git",repos = BiocManager::repositories())
 
 library(omiicsRNAseq)
 
@@ -507,8 +506,8 @@ server <- function(input, output) {
 
   output$volcano_text <- renderUI({
     req(gene_results_filtered())
-    s0 <- "The volcano plot shows a summary of the differential expression regression analysis."
-    s1 <- "The plot can be colored by typing a search term for a given column in one of the text boxes to the left."
+    s0 <- "The volcano plot shows a summary of the differential expression regression analysis. Only 10 percent on non-significant genes are plotted. You can adjust the probability and fold cutoff in the input section."
+    s1 <- "The plot can be colored by typing a search term for a given column in one of the text boxes to the left. You can use .* to indicate wildcards."
     s3 <- "You can also export the figure in svg by pressing the camera symbol in the top right corner. If you click on items in the legend they are removed from view."
     s2 <- "You can interact with the plot to zoom in on an area when the zoom option is selected, and you can select datapoints of interest. This will show details on the specific genes, and a boxplot will be plotted showing normalized gene expressions."
 
@@ -517,8 +516,8 @@ server <- function(input, output) {
 
   output$volcano <- renderPlotly({
     req(gene_results_filtered(), eval(parse(text = input$p))<p_max)
-    colnames(gene_results_filtered())
-    saveRDS(gene_results_filtered(), file = "volcano_data.RDS")
+    #saveRDS(gene_results_filtered(), file = "volcano_data.RDS")
+    #print(colnames(gene_results_filtered()))
     volcano_plot(input = input, data = gene_results_filtered(), pathway_dic = pathway_dic())})
 
   output$volcano_title_circ <- renderUI({
@@ -607,7 +606,7 @@ server <- function(input, output) {
       ann <- pheno[[input$pca_pheno]]
     }
     #saveRDS(scores[,1:3], file = "pca_scores")
-    saveRDS(cbind(ann,row.names(df_out)), file = "pca_ann.RDS")
+    #saveRDS(cbind(ann,row.names(df_out)), file = "pca_ann.RDS")
     plot_ly(x=scores[,1], y=scores[,2], z=scores[,3], type = "scatter3d", mode="markers",name = row.names(df_out), color = ann) %>%
       layout(scene = list(xaxis = list(title = "PC1"), yaxis = list(title = "PC2"), zaxis = list(title = "PC3"))) %>%
       config(
@@ -799,7 +798,9 @@ server <- function(input, output) {
 
 
   observeEvent(event_data("plotly_selected"), {
-    req(!is.null(event_data("plotly_selected")))
+    req(length(event_data("plotly_selected"))!=0)
+    req(!is.null(event_data("plotly_selected")),nrow(event_data("plotly_selected"))>1)
+    print(event_data("plotly_selected"))
     d <- event_data("plotly_selected")
     d$curveNumber <- NULL
     d$pointNumber <- NULL
