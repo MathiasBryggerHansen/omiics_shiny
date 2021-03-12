@@ -1,0 +1,21 @@
+app <- ShinyDriver$new("../../")
+app$snapshotInit("mytest")
+
+app$uploadFile(count1 = "pancreatic_ductal_adenocarcinoma_hs_raw_counts.txt") # <-- This should be the path to the file, relative to the app's tests/shinytest directory
+app$uploadFile(phenotype1 = "pancreatic_ductal_adenocarcinoma_hs_pheno.txt") # <-- This should be the path to the file, relative to the app's tests/shinytest directory
+app$setInputs(start = "click")
+app$setInputs(use_cancer = TRUE)
+app$setInputs(use_neuro = TRUE)
+app$setInputs(chain = TRUE)
+app$setInputs(Atlas_ids = "	E-GEOD-48812")
+app$setInputs(Atlas_ids = "E-GEOD-48812")
+app$setInputs(Atlas_run = "click")
+app$setInputs(volcano_col = "log2")
+app$setInputs(volcano_col = "log2*")
+app$setInputs(volcano_col = "log2")
+app$setInputs(volcano_col = "log2/")
+app$setInputs(volcano_col = "log2")
+app$setInputs(volcano_col = "log2.")
+app$setInputs(volcano_col = "log2.*")
+app$setInputs(volcano_col = "log2.*48")
+app$snapshot()
