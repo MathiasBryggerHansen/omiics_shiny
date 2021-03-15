@@ -48,6 +48,7 @@ server <- function(input, output) {
   #Runs count2deseq_analysis() or limma_analysis() for the data inputs.
   gene_results_de <- reactive({
     req(input_data$inp)
+    showNotification("DE is running...",type = "message",duration = 10)
     res <- list()
     files <- input_data$inp
     for (i in 1:input$nfiles){
@@ -87,6 +88,7 @@ server <- function(input, output) {
         res[[toString(i)]] <- limma_analysis(countdata = temp,phenotypes = pheno[[1]],design = mm)
       }
     }
+    showNotification("DE done, now doing secondary analysis and gaphics.",type = "message",duration = 10)
     return(res)
   })
 
@@ -517,7 +519,6 @@ server <- function(input, output) {
   output$volcano <- renderPlotly({
     req(gene_results_filtered(), eval(parse(text = input$p))<p_max)
     #saveRDS(gene_results_filtered(), file = "volcano_data.RDS")
-    #print(colnames(gene_results_filtered()))
     volcano_plot(input = input, data = gene_results_filtered(), pathway_dic = pathway_dic())})
 
   output$volcano_title_circ <- renderUI({
@@ -574,8 +575,8 @@ server <- function(input, output) {
   output$pca_text <- renderUI({
     req(gene_results())
     s1 <- "The PCA plot shows the first three principle components discriminating each sample."
-    s2 <- "By using your curser, you can zoom in and out and rotate the view."
-    s3 <- "You can export the figure when you have found a fitting angle."
+    s2 <- "By using your scroll, you can zoom in and out and clicking and dragging the curser will rotate the view."
+    s3 <- "You can export the figure when you have found a fitting angle by clicking the photo symbol in the upper corner."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
 
@@ -800,7 +801,6 @@ server <- function(input, output) {
   observeEvent(event_data("plotly_selected"), {
     req(length(event_data("plotly_selected"))!=0)
     req(!is.null(event_data("plotly_selected")),nrow(event_data("plotly_selected"))>1)
-    print(event_data("plotly_selected"))
     d <- event_data("plotly_selected")
     d$curveNumber <- NULL
     d$pointNumber <- NULL
@@ -1085,7 +1085,7 @@ server <- function(input, output) {
   })
   output$stringdb_text <- renderUI({
     req(gene_results())
-    HTML(paste(" ",p("String db protein interaction network, as default this will include all the significant hits defined by the user."), sep = '<br/>'))
+    HTML(paste(" ",p("String db protein interaction network, as default this will include all the significant hits."), sep = '<br/>'))
   })
   output$stringdb_title <- renderUI({
     req(gene_results())
@@ -1131,6 +1131,7 @@ ui <- fluidPage(
       textInput(inputId = "volcano_col", label = "A column to annotate color in volcano plot",value = "gene_biotype"),
       textInput(inputId = "col_high", label = "Color of continuous high values", value = "red"),
       textInput(inputId = "col_low", label = "Color of continuous low values", value = "blue"),
+      numericInput(inputId = "alpha", label = "Alpha (seethrough) value for volcano plot", value = 0.5),
       #checkboxInput(inputId = "pca_pheno", label = "Annotate PCA with phenotype", value = F),
       numericInput(inputId = "pca_pheno", label = "PCA annotation column", value = 1),
       checkboxInput(inputId = "log_scale", label = "Scale color values"),
