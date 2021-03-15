@@ -872,8 +872,8 @@ server <- function(input, output) {
     output$boxplot_search_text <- renderUI({
       req(gene_results_filtered())
       s1 <- "The boxplot shows the expression of the genes selected."
-      s2 <- "You can export the figure in svg by pressing the camera symbol."
-      s3 <- "By hovering over the plot you can see the values for each gene."
+      s2 <- "By hovering your curser over the plot you can see the values for each gene."
+      s3 <- "You can export the figure in svg by pressing the camera symbol."
       HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
     })
 
@@ -971,37 +971,37 @@ server <- function(input, output) {
     row.names(data) <- make.names(ifelse(is.na(data$gene_symbol)|data$gene_symbol == "",data$ensembl_gene_id,data$gene_symbol),unique = T)
 
     if(input$chain){
-      #data <- data[row.names(data)%in%gene_set,]
       gene_symbol <- gene_results()[input$gene_results_table_rows_current,"gene_symbol"]
-      #gene_symbol <- gene_results()[input$gene_results_table_rows_current,"gene_symbol"]
       data <- data[row.names(data)%in%gene_symbol,]#gene_results_table_rows_all is not ordered like gene_results, fix?
 
     }
     else{
       gene_symbol <- unique(gene_results()[order(gene_results()$padj,decreasing = F)[1:200],"gene_symbol"])
-      #gene_symbol <- gene_results()[order(gene_results()$padj,decreasing = F)[1:200],"gene_symbol"]
       data <- data[row.names(data)%in%gene_symbol,]
-      #data <- merge(data,ensembl2idl(),by = "ensembl_gene_id",all.x = T)
-      #data$gene_symbol <- gene_symbol[ensembl%in%row.names(data)] #ifelse(is.na(data$gene_symbol)|data$gene_symbol == "",data$ensembl_gene_id,data$gene_symbol)
     }
-
-    #data <- merge(data,,by = "ensembl_gene_id",all.x = T)
-    #gene_symbol[row.names(data)%in%ensembl]
     data <- data[,sample_ids]
     data <- data[apply(X = data,1, function(x) var(x)!=0),]
-    saveRDS(cor(data.frame(t(data)),method = "spearman"), file = "gene_gene.RDS")
-    heatmaply(cor(data.frame(t(data)),method = "spearman"),scale_fill_gradient_fun = scale_fill_gradient(low = input$col_low, high = input$col_high)) %>%
-      config(toImageButtonOptions = list(format = "svg",
-                                         filename = "gene_gene_interaction",
-                                         width = 2500,
-                                         height = 2500))
+    data_cor <- cor(data.frame(t(data)),method = "spearman")
+    if(input$cor_abs == FALSE){
+      p <- heatmaply(data_cor,scale_fill_gradient_fun = scale_fill_gradient(low = input$col_low, high = input$col_high))
+    }
+    else {
+      data_cor <- abs(data_cor)
+
+    }
+    p <- heatmaply(data_cor,scale_fill_gradient_fun = scale_fill_gradient(low = input$col_low, high = input$col_high))
+    p %>% config(toImageButtonOptions = list(format = "svg",
+                                       filename = "gene_gene_interaction",
+                                       width = 2500,
+                                       height = 2500))
   })
   output$gene_gene_text <- renderUI({
     req(gene_results_filtered())
     s1 <- "Gene-gene expression correlation (spearman) of a selection of genes. The default uses the DE tophits. By using the chaining option in the left section the genes shown will be filtered by the current rows shown in the DE table."
+    s1.1 <- "This can give an overview of interactions/co-expressions of the given genes."
     s2 <- "You can export the figure in svg by pressing the camera symbol."
     s3 <- "By hovering over the plot you can see the values for each gene pair."
-    HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
+    HTML(paste("<p>",paste(s1,s1.1, s2, s3,sep = '<br/>'),"</p>"))
   })
 
   output$gene_sample_title <- renderUI({
@@ -1012,7 +1012,6 @@ server <- function(input, output) {
     req(gene_results())
     data <- data.frame(gene_results_de()[["1"]]$norm_counts)
     pheno <- data.frame(gene_results_de()[["1"]]$phenotypes)
-    #names(pheno) <- "phenotype"
     sample_ids <- colnames(data)
     if(sum(grepl(row.names(data), pattern = "ENS"))> nrow(data)/2){#check if gene ids are ensembl, otherwise assume hgnc
       data$ensembl_gene_id <- row.names(data)
@@ -1025,32 +1024,32 @@ server <- function(input, output) {
     row.names(data) <- make.names(ifelse(is.na(data$gene_symbol)|data$gene_symbol == "",data$ensembl_gene_id,data$gene_symbol),unique = T)
 
     if(input$chain){
-      #data <- data[row.names(data)%in%gene_set,]
       gene_symbol <- gene_results()[input$gene_results_table_rows_current,"gene_symbol"]
-      #gene_symbol <- gene_results()[input$gene_results_table_rows_current,"gene_symbol"]
       data <- data[row.names(data)%in%gene_symbol,]#gene_results_table_rows_all is not ordered like gene_results, fix?
 
     }
     else{
       gene_symbol <- unique(gene_results()[order(gene_results()$padj,decreasing = F)[1:200],"gene_symbol"])
-      #gene_symbol <- gene_results()[order(gene_results()$padj,decreasing = F)[1:200],"gene_symbol"]
       data <- data[row.names(data)%in%gene_symbol,]
-      #data <- merge(data,ensembl2idl(),by = "ensembl_gene_id",all.x = T)
-      #data$gene_symbol <- gene_symbol[ensembl%in%row.names(data)] #ifelse(is.na(data$gene_symbol)|data$gene_symbol == "",data$ensembl_gene_id,data$gene_symbol)
     }
-
-    #data <- merge(data,,by = "ensembl_gene_id",all.x = T)
-    #gene_symbol[row.names(data)%in%ensembl]
     data <- data[,sample_ids]
     names(pheno) <- "phenotype"
     data <- data[apply(X = data,1, function(x) var(x)!=0),]
-    heatmaply(data,scale_fill_gradient_fun = scale_fill_gradient(low = input$col_low, high = input$col_high), col_side_colors = pheno,distfun = "spearman") %>%
+    heatmaply(cor(data, method = "spearman"),scale_fill_gradient_fun = scale_fill_gradient(low = input$col_low, high = input$col_high), col_side_colors = pheno,distfun = "spearman") %>%
       config(toImageButtonOptions = list(format = "svg",
                                          filename = "gene_sample_interaction",
                                          width = 2500,
                                          height = 2500))
   })
 
+  output$gene_sample_text <- renderUI({
+    req(gene_results_filtered())
+    s0 <- "Similar to the gene-gene correlation heatmap, but this clusters the samples and is useful for discovering defining expression features."
+    s1 <- "Gene-sample expression correlation (spearman) of a selection of genes. The default uses the DE tophits. By using the chaining option in the left section the genes shown will be filtered by the current rows shown in the DE table."
+    s2 <- "You can export the figure in svg by pressing the camera symbol."
+    s3 <- "By hovering over the plot you can see the values for each gene pair."
+    HTML(paste("<p>",paste(s0, s1, s2, s3,sep = '<br/>'),"</p>"))
+  })
 
 
   #onclick("button", {
@@ -1131,11 +1130,10 @@ ui <- fluidPage(
       textInput(inputId = "volcano_col", label = "A column to annotate color in volcano plot",value = "gene_biotype"),
       textInput(inputId = "col_high", label = "Color of continuous high values", value = "red"),
       textInput(inputId = "col_low", label = "Color of continuous low values", value = "blue"),
-      numericInput(inputId = "alpha", label = "Alpha (seethrough) value for volcano plot", value = 0.5),
-      #checkboxInput(inputId = "pca_pheno", label = "Annotate PCA with phenotype", value = F),
+      numericInput(inputId = "alpha", label = "Alpha (seethrough) value for volcano plot", value = 0.5, min = 0.1, max = 1),
       numericInput(inputId = "pca_pheno", label = "PCA annotation column", value = 1),
-      checkboxInput(inputId = "log_scale", label = "Scale color values"),
-      #,rat = "rat",chicken = "chicken",zebrafish = "zebrafish"
+      checkboxInput(inputId = "cor_abs", label = "Absolute correlation values", value = FALSE),
+      checkboxInput(inputId = "log_scale", label = "Scale color values", value = FALSE),
       actionButton(inputId = "start", label = "Start Analysis!"),
 
       tags$hr(),
