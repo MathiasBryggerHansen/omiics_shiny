@@ -319,7 +319,7 @@ server <- function(input, output) {
   output$string_db_enr_text <- renderUI({
     req(gene_results_filtered())
     s1 <- "This table shows a summary of a enrichment analysis in the string database for protein interactions."
-    s3 <- "Similarly to the other enrichment analysis, by selecting columns with your curser, you filter on the proteins shown in the Stringdb network below."
+    s3 <- "Similarly to the other enrichment analysis, by selecting columns with your cursor, you filter on the proteins shown in the Stringdb network below."
     HTML(paste("<p>",paste(s1,s3,sep = '<br/>'),"</p>"))
   })
   string_db_results <- reactive({
@@ -410,13 +410,22 @@ server <- function(input, output) {
   output$pca_text <- renderUI({
     req(gene_results())
     s1 <- "The PCA plot shows the first three principle components discriminating each sample."
-    s2 <- "By using your scroll, you can zoom in and out and clicking and dragging the curser will rotate the view."
+    s2 <- "By using your scroll, you can zoom in and out and clicking and dragging the cursor will rotate the view."
     s3 <- "You can export the figure when you have found a fitting angle by clicking the photo symbol in the upper corner."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
 
   output$pca <- renderPlotly({
     req(gene_results_de())
+    pheno <- input_data$inp[[paste0("pheno",1)]]
+    if(input$pca_pheno > ncol(pheno)){
+      showNotification("You need to specify a valid column number",type = "message")
+      ann <- pheno[[1]]
+    }
+    else {
+      ann <- factor(input$pca_pheno)
+    }
+    req(input$pca_pheno > ncol(pheno))
     if(input[["raw_counts1"]]){
       data_norm <- gene_results_de()[["1"]][["dds"]]
       data_norm <- data.frame(assay(varianceStabilizingTransformation(data_norm)) )
@@ -430,17 +439,9 @@ server <- function(input, output) {
     data_norm$ensembl_gene_id <- NULL
     data_norm$Name <- NULL
     data_norm$Description <- NULL
-    pheno <- input_data$inp[[paste0("pheno",1)]]
     df_pca  <- prcomp(t(data_norm),scale = T, center = T)
     df_out <- as.data.frame(df_pca$x)
     scores <- df_pca$x
-    if(input$pca_pheno > ncol(pheno)){
-      showNotification("You need to specify a valid column number",type = "message")
-      ann <- pheno[[1]]
-    }
-    else{
-      ann <- pheno[[input$pca_pheno]]
-    }
     #saveRDS(scores[,1:3], file = "pca_scores")
     #saveRDS(cbind(ann,row.names(df_out)), file = "pca_ann.RDS")
     plot_ly(x=scores[,1], y=scores[,2], z=scores[,3], type = "scatter3d", mode="markers",name = row.names(df_out), color = ann) %>%
@@ -506,8 +507,8 @@ server <- function(input, output) {
 
   output$sign_pheno_exp_text <- renderUI({
     req(gene_results())
-    s1 <- "This table shows datasets from the Expression Atlas database, which shows a significant correlation with the primary dataset."
-    s2 <- "You can include one or more of the datasets by inserting their IDs comma seperated in one of the search fields to the left."
+    s1 <- "This table shows datasets from the Expression Atlas database which are significantly correlated with the primary dataset."
+    s2 <- "You can include one or more of the datasets by inserting their IDs comma seperated in one of the search fields to the left. Follow the link for more information of the given dateset."
     s3 <- "The added datasets can for example be used to annotate your primary dataset, or you can create a new volcano plot with the input."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
@@ -542,7 +543,7 @@ server <- function(input, output) {
     req(gene_results(),input$use_cancer)
     s1 <- "This heatmap shows a collective selection of datasets, showing significant fold change in a subset of genes."
     s2 <- "Non-significant and missing values are set to zero. The fold change values are capped at 3 to give a better visual interpretation."
-    s3 <- "You can always hover your curser over a datapoint to get information about the x and y axis."
+    s3 <- "You can always hover your cursor over a datapoint to get information about the x and y axis."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
 
@@ -591,7 +592,7 @@ server <- function(input, output) {
     req(gene_results(),input$use_neuro)
     s1 <- "This heatmap shows a collective selection of datasets, showing significant fold change in a subset of genes."
     s2 <- "Non-significant and missing values are set to zero. The fold change values are capped at 3 to give a better visual interpretation."
-    s3 <- "You can always hover your curser over a datapoint to get information about the x and y axis."
+    s3 <- "You can always hover your cursor over a datapoint to get information about the x and y axis."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
 
@@ -683,7 +684,7 @@ server <- function(input, output) {
     output$boxplot_search_text <- renderUI({
       req(gene_results_filtered())
       s1 <- "The boxplot shows the expression of the genes selected."
-      s2 <- "By hovering your curser over the plot you can see the values for each gene."
+      s2 <- "By hovering your cursor over the plot you can see the values for each gene."
       s3 <- "You can export the figure in svg by pressing the camera symbol."
       HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
     })
@@ -756,8 +757,8 @@ server <- function(input, output) {
   output$sign_pathways_text <- renderUI({
     req(gene_results_filtered())
     s1 <- "This table shows a summary of a enrichment analysis by the R package enrichR including GO molecular function, GO cellular function and Reactome and KEGG pathways."
-    s2 <- "You can search for a given GO, pathway or related phenotype in the search field. The table can be downloaded by interacting with the left interface."
-    s3 <- "By selecting columns with your curser, you filter on the proteins shown in the Stringdb network below."
+    s2 <- "You can search for a given GO, pathway or related phenotype in the search field. The table can be downloaded at the bottom of the Post Analysis section."
+    s3 <- "By selecting columns with your cursor, you filter on the proteins shown in the Stringdb network below."
     HTML(paste("<p>",paste(s1, s2,s3,sep = '<br/>'),"</p>"))
   })
 
@@ -809,7 +810,7 @@ server <- function(input, output) {
 
   output$gene_gene_text <- renderUI({
     req(gene_results_filtered())
-    s1 <- "Gene-gene expression correlation (spearman) of a selection of genes. The default uses the DE tophits. By using the chaining option in the left section the genes shown will be filtered by the current rows shown in the DE table."
+    s1 <- "Gene-gene expression correlation (spearman) of a selection of genes. The default uses the DE tophits. By using the chaining option in the Secondary Parameter section the genes shown will be filtered by the current rows shown in the DE table."
     s1.1 <- "This can give an overview of interactions/co-expressions of the given genes."
     s2 <- "You can export the figure in svg by pressing the camera symbol."
     s3 <- "By hovering over the plot you can see the values for each gene pair."
@@ -856,11 +857,11 @@ server <- function(input, output) {
 
   output$gene_sample_text <- renderUI({
     req(gene_results_filtered())
-    s0 <- "Similar to the gene-gene correlation heatmap, but this clusters the samples based on normalized expression values and is useful for discovering defining expression features."
-    s1 <- "Gene-sample expression correlation (spearman) of a selection of genes. The default uses the DE tophits. By using the chaining option in the left section the genes shown will be filtered by the current rows shown in the DE table."
+    s0 <- "Similar to the gene-gene correlation heatmap, but this plot clusters the samples based on normalized expression values and is useful for discovering defining expression features."
+    s1 <- "Like the other heatmap, you can filter it using the chaining option."
     s2 <- "You can export the figure in svg by pressing the camera symbol."
     s3 <- "By hovering over the plot you can see the values for each gene pair."
-    HTML(paste("<p>",paste(s0, s1, s2, s3,sep = '<br/>'),"</p>"))
+    HTML(paste("<p>",paste(s1, s0, s2, s3,sep = '<br/>'),"</p>"))
   })
 
 
@@ -898,6 +899,14 @@ server <- function(input, output) {
     req(gene_results())
     HTML(paste(" ",p("String db protein interaction network, as default this will include all the significant hits."), sep = '<br/>'))
   })
+  output$stringdb_text <- renderUI({
+    req(gene_results())
+    s1 <- "String db protein interaction network, as default this will include all the significant hits."
+    s2 <- "If you click the STRING button, your work will be lost, and you will go to the STRINGdb browser for the network."
+    s3 <- "You can drag the proteins around as you please. By click a protein you can see the structure along with further information."
+    HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
+  })
+
   output$stringdb_title <- renderUI({
     req(gene_results())
     HTML(paste(" ",h3("Stringdb network"), sep = '<br/>'))
