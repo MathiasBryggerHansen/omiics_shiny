@@ -1,4 +1,3 @@
-#error=function()traceback(2))
 options(shiny.maxRequestSize = 100*1024^2)
 
 
@@ -15,6 +14,7 @@ install_load <- function(packages){
      }
   }
 }
+
 install_load(requiredpackages)
 if("omiicsRNAseq" %in% loadedNamespaces()){
   detach("package:omiicsRNAseq", unload=TRUE)
@@ -48,7 +48,7 @@ server <- function(input, output) {
   #Runs count2deseq_analysis() or limma_analysis() for the data inputs.
   gene_results_de <- reactive({
     req(input_data$inp)
-    showNotification("DE is running...",type = "message",duration = 10)
+    showNotification("DE analysis is running...",type = "message",duration = 10)
     res <- list()
     files <- input_data$inp
     for (i in 1:input$nfiles){
@@ -88,58 +88,11 @@ server <- function(input, output) {
         res[[toString(i)]] <- limma_analysis(countdata = temp,phenotypes = pheno[[1]],design = mm)
       }
     }
-    showNotification("DE done, now doing secondary analysis and gaphics.",type = "message",duration = 10)
+    showNotification("DE analysis done, now doing secondary analysis and gaphics.",type = "message",duration = 10)
     return(res)
   })
 
-  #Adds data from the secondary datasets to the main.
-
-  # input_d <- function(){
-  #   files <- list()
-  #   for( d in 1:input$nfiles){
-  #       if(input[[paste0("combined",d)]]){#test for combined text file
-  #         counts_data <- read.csv(input[[paste0("count",d)]][["datapath"]], sep = input[[paste0("sep",d)]], header = T,comment.char = "!") #comment.char = "!" in CEL files
-  #       }
-  #       else{
-  #         d_path <- input[[paste0("count",d)]][["datapath"]]
-  #         temp_dir <- paste0("./temp",d)
-  #         unlink(temp_dir, recursive=TRUE,force = T) #remove if exists
-  #         dir.create(temp_dir)
-  #         unzip(d_path,exdir = temp_dir,overwrite = T)
-  #         dir_name <- list.files(temp_dir)
-  #         counts_data <- read_files(paste0(temp_dir,"/",dir_name),d)
-  #       }
-  #       if(input$gene_filter){
-  #         counts_data <- counts_data[apply(X = counts_data,1, function(x) var(x)!=0),] #remove zero variance genes, Warning in var(x) : NAs introduced by coercion
-  #       }
-  #       pheno_data <- read.table(input[[paste0("phenotype",d)]][["datapath"]],header = T)#read_pheno(input[[paste0("phenotype",d)]][["datapath"]]) #phenotype data is always assumed to be tabulated, the function handles some errors in read.csv
-  #       if(input$gene_id_col & input[[paste0("combined",d)]]){
-  #         row.names(counts_data) <- make.names(counts_data[,1],unique = T)
-  #         counts_data[,1] <- NULL
-  #       }
-  #       pheno_keep <- grepl(colnames(counts_data),pattern = paste(pheno_data[[2]],collapse = "|"))
-  #       ids <- row.names(counts_data)
-  #       if(!grepl(ids[1],pattern = "ENS")){
-  #         ids <- probe_library()$ensembl_gene_id[match(x = ids, probe_library()$probe)]
-  #         row.names(counts_data) <- make.names(ids,unique = T)
-  #       }
-  #       counts_data <- counts_data[,c(pheno_keep)]#colnames(counts_data)%in%pheno_data[[2]]] #remove samples not in pheno
-  #       colnames(counts_data) <- pheno_data[[2]]
-  #       counts_data <- counts_data[order(row.names(counts_data)),] #a way to secure compatible order????
-  #       files[[paste0("count",d)]] <- counts_data
-  #       files[[paste0("pheno",d)]] <- pheno_data
-  #     }
-  #   return(files)
-  # }
-
   ############################################################################################################
-
-  # output$volcano_out <- downloadHandler({
-  #     file <- "volcano_plot.pdf"
-  #   }, content = function(file){
-  #     ggsave(file, plot = plotVolcano(), device = "pdf")
-  #   })
-
 
   output$significant_genes <- downloadHandler({
     file <- "significant_genes.txt"
@@ -155,37 +108,9 @@ server <- function(input, output) {
     write.table(enrich_out(), file, row.names = FALSE,sep = "\t",quote = F)
   })
 
-
-  # output$string_db <- downloadHandler({
-  #     file <- "stringdb_interaction_network.pdf"
-  #   }, content = function(file){
-  #     ggsave(file, plot = plotStringdb(), device = "pdf")
-  #   })
-
   observeEvent(input$start, {
     showNotification("Analysis will be running for some seconds...",type = "message",duration = 10)
   })
-
-  # output$fileInputs <- renderUI({
-  #   html_ui = " "
-  #   for (i in 1:input$nfiles){#checkboxInput(inputId = paste0("CEL",i), label="Is CEL", FALSE),
-  #     html_ui <- paste0(html_ui, fileInput(paste0("count",i), label=paste0("count data ",i)), fileInput(paste0("phenotype",i),
-  #     label=paste0("phenotype data ",i)), checkboxInput(inputId = paste0("raw_counts",i), label="Is raw counts", TRUE),
-  #     radioButtons(paste0("sep",i), "Separator",choices = c(Comma = ",",Semicolon = ";",Tab = "\t"),selected = "\t",inline = T),
-  #     checkboxInput(inputId = paste0("combined",i), label="Is combined", TRUE),
-  #     checkboxInput(inputId = "gene_id_col", label = "The first column has gene ids", value = F),
-  #     textInput(inputId = paste0("phen",i),label = "Phenotype id",value = "Case"))
-  #   }
-  #   if(input$afiles > 0){
-  #     for (i in 1:input$afiles){
-  #       html_ui <- paste0(html_ui, fileInput(paste0("afile",i), label=paste0("annotation file ",i)),
-  #                         checkboxGroupInput(inputId = paste0("anno_range",i),choices = list("Col 2" = 2, "Col 3" = 3, "Col 4" = 4),selected = 2, label="Columns to include in annotation", TRUE),
-  #                         radioButtons(paste0("sep_a",i), "Separator",choices = c(Comma = ",",Semicolon = ";",Tab = "\t"),selected = "\t"))
-  #     }
-  #   }
-  #
-  #   HTML(html_ui)
-  # })
 
   output$fileInputs <- renderUI({
     html_ui = " "
@@ -219,56 +144,9 @@ server <- function(input, output) {
   input_data <- reactiveValues()
 
   observeEvent(input$start, {
-    #tryCatch({
     input_data$inp <- input_d(input)
-    #},
-    #error=function(x){
-    #  showNotification("The data provided does not fit the requirements, please retry",type = "message",duration = 10)
-    #})
   })
 
-
-
-  # gene_results <- reactive({##gene_symbol
-  #   req(gene_results_de())
-  #   data <- gene_results_de()[["1"]][["test"]]##c("padj",multiple "log2FoldChange","baseMean","pvalue","stat","lfcSE")
-  #   data$ensembl_gene_id <- row.names(data)
-  #
-  #   data <- merge(data,ensembl2id(),by = "ensembl_gene_id",all.x = T)#ensembl2id() includes : gene_symbol, wiki_id, biotype
-  #   if(input$species == "human"|input$species == "mouse"){#could be extended with a filter that takes in a TF id, and filters for genes that it interacts with
-  #     tf_data <- read.table(paste0("trrust_rawdata.",input$species,".tsv"),header = T)
-  #     tf_data$position <- NULL
-  #     data$TF <- data$gene_symbol%in%tf_data$gene_symbol
-  #   }
-  #   #data$gene_symbol <- gsub(x = ifelse(is.na(data$gene_symbol)|data$gene_symbol == "",data$ensembl_gene_id,data$gene_symbol),pattern = "\\..+$", replacement = "")
-  #   data <- append_secondary_data(data)#annotate log2FoldChange_i, padj_i, from the secondary datasets, also Atlas Search
-  #   data <- append_annotation(data)
-  #   if(input$species == "human"|input$species == "mouse"){
-  #     paths <- data.frame(matrix(rep(NA,length(data$gene_symbol)*length(names(pathway_dic()))),ncol = length(names(pathway_dic()))))
-  #     colnames(paths) <- names(pathway_dic())
-  #     for(db in 1:length(names(pathway_dic()))){
-  #         for(s in 1:length(data$gene_symbol)){
-  #           paths[s,db] <- paste(pathway_dic()[[names(pathway_dic())[db]]][[data$gene_symbol[s]]],collapse = ", ")
-  #       }
-  #     }
-  #     for(db in names(pathway_dic())){
-  #      data[[db]] <- paths[,db]
-  #     }
-  #   }
-  #   else{#mouse is could be made an exception, requires an updated dictionary
-  #     for(db in names(pathway_dic())){
-  #       data[[db]] <- "-"
-  #     }
-  #   }
-  #   #wikigene_ids$gene_symbol <- NULL#maybe just not include it in file
-  #   #data <- merge(data, wikigene_ids, by = "ensembl_gene_id",all.x = T)
-  #   wiki_link <- sapply(data$wikigene_id, function(x) ifelse(is.na(x),"-",paste0(c("https://www.wikigenes.org/e/gene/e/",x,".html"),collapse = "")))
-  #   refs <- paste0("<a href='",  wiki_link, "' target='_blank'>",wiki_link,"</a>")
-  #   data$wiki_link <- refs
-  #   data$wikigene_id <- NULL
-  #   data <- data[order(data$padj),]
-  #   return(data)
-  # })
   gene_results <- reactive({##gene_symbol
     req(gene_results_de())
     data <- gene_results_de()[["1"]][["test"]]##c("padj",multiple "log2FoldChange","baseMean","pvalue","stat","lfcSE")
@@ -339,49 +217,6 @@ server <- function(input, output) {
     data_sign <- data_sign[!is.na(data_sign[[1]]),] #Why do columns with NA occur?
     return(data_sign)
   })
-
-  # gene_results_de <- reactive({
-  #   req(input_data$inp)
-  #   res <- list()
-  #   files <- input_data$inp
-  #   for (i in 1:input$nfiles){
-  #     counts <- files[[paste0("count",i)]]
-  #     pheno <- files[[paste0("pheno",i)]]
-  #     circ <- files[[paste0("circRNA",i)]]
-  #     pheno[[2]] <- NULL
-  #     ids <- row.names(counts)
-  #     if(!grepl(ids[1],pattern = "ENS")){
-  #       ids <- probe_library()$ensembl_gene_id[match(x = ids, probe_library()$probe)]
-  #     }
-  #     row.names(counts) <- make.names(ids,unique = T)
-  #     if(!is.null(circ)){
-  #       res[[paste0("circRNA",toString(i))]] <- de_circ(data = circ,pheno = pheno,i = i)
-  #     }
-  #
-  #     if(input[[paste0("raw_counts",i)]]){
-  #       res[[toString(i)]] <- count2deseq_analysis(input, countdata = counts, pheno = pheno)
-  #     }
-  #     else {
-  #       d0 <- DGEList(assays(temp)$counts)
-  #       if(input$gene_filter){
-  #         d0 <- d0[filterByExpr(d0, group=pheno),, keep.lib.sizes=FALSE]
-  #       }
-  #       d0 <- calcNormFactors(d0, method = "TMM")# #TMM normalization #assays(counts) - only from atlas
-  #       #counts <- cpm(counts,log = T)
-  #       f <- factor(pheno[[1]], levels=unique(pheno[[1]]))#phenotypes[[1]]
-  #       if(input$batch_correction){
-  #         batch <- pheno[[3]]
-  #         mm <- model.matrix(~batch+f)
-  #       }
-  #       else{
-  #         mm <- model.matrix(~0+f)
-  #       }
-  #       temp <- voom(d0, mm)
-  #       res[[toString(i)]] <- limma_analysis(countdata = temp,phenotypes = pheno[[1]],design = mm)
-  #     }
-  #   }
-  #   return(res)
-  # })
 
   output$FC_data_title_cancer <- renderUI({
     req(gene_results(),input$use_cancer)
@@ -455,7 +290,7 @@ server <- function(input, output) {
   #################
 
   stringdb_all <- reactive({
-    req(gene_results(),eval(parse(text = input$p))<p_max)#Avoid overload
+    req(gene_results(),eval(parse(text = input$p))<p_max, eval(parse(text = input$p)) != 0)#Avoid overload
     gene_filtered <- gene_results()[gene_results()$padj < eval(parse(text = input$p)) & !is.na(gene_results()$padj) & abs(gene_results()$log2FoldChange) > log2(input$fc),]
     gene_filtered <- gene_filtered[!is.na(gene_filtered$gene_symbol),]
     #cat(file = stdout(), colnames(gene_filtered))
@@ -599,7 +434,7 @@ server <- function(input, output) {
     df_pca  <- prcomp(t(data_norm),scale = T, center = T)
     df_out <- as.data.frame(df_pca$x)
     scores <- df_pca$x
-    if(input$pca_pheno > nrow(pheno)){
+    if(input$pca_pheno > ncol(pheno)){
       showNotification("You need to specify a valid column number",type = "message")
       ann <- pheno[[1]]
     }
@@ -841,30 +676,6 @@ server <- function(input, output) {
       #}, sanitize.text.function = function(x) x, digits = 3)#, sanitize.text.function = function(x) x)
     })
 
-    # output$delta_cor_title <- renderUI({
-    #   req(gene_results_de())
-    #   HTML(paste(" ",h3("Delta values of correlation between selected gene expressions (cor(case) - cor(control))"),sep = '<br/>'))
-    # })
-    # output$delta_cor <- renderUI({
-    #   plotlyOutput("delta_c")
-    # })
-    #
-    # output$delta_c <- renderPlotly({ #remove
-    #   pheno <- gene_results_de()[["1"]][["phenotypes"]] #$phenotype#ifelse(grepl(colnames(our_exp),pattern = "^H"),"Control", "Case") #another way to define phenotype needs to be added
-    #   ref <- names(table(pheno))[grepl(names(table(pheno)),pattern = "control|normal|reference",ignore.case = T)]
-    #   cases <- count_sub[,pheno != ref]
-    #   control <- count_sub[,pheno == ref]
-    #   delta_cor <- cor(t(cases),method = "spearman") - cor(t(control),method = "spearman")
-    #   heatmaply(as.matrix(delta_cor),Rowv = F,Colv = F,scale_fill_gradient_fun = scale_fill_gradient(low = input$col_low, high = input$col_high)) %>%
-    #     config(
-    #       toImageButtonOptions = list(
-    #         format = "svg",
-    #         filename = "delta_cor",
-    #         width = 1500,
-    #         height = 1000
-    #       ))
-    # })
-
     output$boxplot_search <- renderUI({
       plotlyOutput("boxplot_s")
     })
@@ -995,6 +806,7 @@ server <- function(input, output) {
                                        width = 2500,
                                        height = 2500))
   })
+
   output$gene_gene_text <- renderUI({
     req(gene_results_filtered())
     s1 <- "Gene-gene expression correlation (spearman) of a selection of genes. The default uses the DE tophits. By using the chaining option in the left section the genes shown will be filtered by the current rows shown in the DE table."
@@ -1035,7 +847,7 @@ server <- function(input, output) {
     data <- data[,sample_ids]
     names(pheno) <- "phenotype"
     data <- data[apply(X = data,1, function(x) var(x)!=0),]
-    heatmaply(cor(data, method = "spearman"),scale_fill_gradient_fun = scale_fill_gradient(low = input$col_low, high = input$col_high), col_side_colors = pheno,distfun = "spearman") %>%
+    heatmaply(data, scale_fill_gradient_fun = scale_fill_gradient(low = input$col_low, high = input$col_high), col_side_colors = pheno,distfun = "spearman") %>%
       config(toImageButtonOptions = list(format = "svg",
                                          filename = "gene_sample_interaction",
                                          width = 2500,
@@ -1044,7 +856,7 @@ server <- function(input, output) {
 
   output$gene_sample_text <- renderUI({
     req(gene_results_filtered())
-    s0 <- "Similar to the gene-gene correlation heatmap, but this clusters the samples and is useful for discovering defining expression features."
+    s0 <- "Similar to the gene-gene correlation heatmap, but this clusters the samples based on normalized expression values and is useful for discovering defining expression features."
     s1 <- "Gene-sample expression correlation (spearman) of a selection of genes. The default uses the DE tophits. By using the chaining option in the left section the genes shown will be filtered by the current rows shown in the DE table."
     s2 <- "You can export the figure in svg by pressing the camera symbol."
     s3 <- "By hovering over the plot you can see the values for each gene pair."
@@ -1130,7 +942,6 @@ ui <- fluidPage(
       textInput(inputId = "volcano_col", label = "A column to annotate color in volcano plot",value = "gene_biotype"),
       textInput(inputId = "col_high", label = "Color of continuous high values", value = "red"),
       textInput(inputId = "col_low", label = "Color of continuous low values", value = "blue"),
-      numericInput(inputId = "alpha", label = "Alpha (seethrough) value for volcano plot", value = 0.5, min = 0.1, max = 1),
       numericInput(inputId = "pca_pheno", label = "PCA annotation column", value = 1),
       checkboxInput(inputId = "cor_abs", label = "Absolute correlation values", value = FALSE),
       checkboxInput(inputId = "log_scale", label = "Scale color values", value = FALSE),
