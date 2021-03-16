@@ -313,12 +313,12 @@ server <- function(input, output) {
   }
 
   output$string_db_enr_title <- renderUI({
-    req(gene_results(),input$use_cancer)
+    req(gene_results())
     HTML(paste(" ",h3("Protein interaction enrichment results"),sep = '<br/>'))
   })
   output$string_db_enr_text <- renderUI({
     req(gene_results_filtered())
-    s1 <- "This table shows a summary of a enrichment analysis in the string database for protein interactions."
+    s1 <- "This table shows a summary of a protein interaction enrichment analysis in the string database for protein interactions."
     s3 <- "Similarly to the other enrichment analysis, by selecting columns with your cursor, you filter on the proteins shown in the Stringdb network below."
     HTML(paste("<p>",paste(s1,s3,sep = '<br/>'),"</p>"))
   })
@@ -344,7 +344,7 @@ server <- function(input, output) {
   output$volcano_text <- renderUI({
     req(gene_results_filtered())
     s0 <- "The volcano plot shows a summary of the differential expression regression analysis. Only 10 percent on non-significant genes are plotted. You can adjust the probability and fold cutoff in the input section."
-    s1 <- "The plot can be colored by typing a search term for a given column in one of the text boxes to the left. You can use .* to indicate wildcards."
+    s1 <- "The plot can be colored by typing a search term for a given column in one of the text boxes to the left. You can use .* to indicate wildcards. In the Post Analysis you can run a K-means clustering algorithm, and annotate the plot with the clusters. Only the significant genes are included in the clustering."
     s3 <- "You can also export the figure in svg by pressing the camera symbol in the top right corner. If you click on items in the legend they are removed from view."
     s2 <- "You can interact with the plot to zoom in on an area when the zoom option is selected, and you can select datapoints of interest. This will show details on the specific genes, and a boxplot will be plotted showing normalized gene expressions."
 
@@ -462,9 +462,9 @@ server <- function(input, output) {
   })
   output$gene_results_text <- renderUI({
     req(gene_results())
-    s1 <- "The table includes analysis results of differential expression along with annotation."
-    s2 <- "It can be filtered by setting filter parameters for each column. You can for example change the range of log2FoldChange or search for a pathway of interest."
-    s3 <- "The table can also be filtered by inserting a list comma separated gene ids (ensembl or hgnc symbol) in the Post Analysis section. This will search for protein interactions with the given genes, and filter on that given list."
+    s1 <- "The DE results table includes analysis results of differential expression along with annotation."
+    s2 <- "It can be filtered by setting filter parameters for each column or globally. You can for example change the range of log2FoldChange or search for a pathway of interest."
+    s3 <- "The table can also be filtered by inserting a list comma separated gene IDs (ensembl or hgnc symbol) in the Post Analysis section. This will search for protein interactions with the given genes, and filter on that given list. Non-matching IDs are ignored."
     s4 <- "You can add new datasets by searching the Atlas Database in the Post Analysis. These can be plotted or used as annotation."
     HTML(paste("<p>",paste(s1, s2, s3, s4,sep = '<br/>'),"</p>"))
   })
@@ -507,8 +507,8 @@ server <- function(input, output) {
 
   output$sign_pheno_exp_text <- renderUI({
     req(gene_results())
-    s1 <- "This table shows datasets from the Expression Atlas database which are significantly correlated with the primary dataset."
-    s2 <- "You can include one or more of the datasets by inserting their IDs comma seperated in one of the search fields to the left. Follow the link for more information of the given dateset."
+    s1 <- "This table shows datasets from the Expression Atlas database that are significantly correlated with the primary dataset."
+    s2 <- "You can include one or more of the datasets by inserting their IDs comma seperated in one of the search fields to the left. Follow the link for more information of the given dataset."
     s3 <- "The added datasets can for example be used to annotate your primary dataset, or you can create a new volcano plot with the input."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
@@ -756,7 +756,7 @@ server <- function(input, output) {
   })
   output$sign_pathways_text <- renderUI({
     req(gene_results_filtered())
-    s1 <- "This table shows a summary of a enrichment analysis by the R package enrichR including GO molecular function, GO cellular function and Reactome and KEGG pathways."
+    s1 <- "This table shows a summary of a pathway/functional enrichment analysis including GO molecular function, GO cellular function and Reactome and KEGG pathways."
     s2 <- "You can search for a given GO, pathway or related phenotype in the search field. The table can be downloaded at the bottom of the Post Analysis section."
     s3 <- "By selecting columns with your cursor, you filter on the proteins shown in the Stringdb network below."
     HTML(paste("<p>",paste(s1, s2,s3,sep = '<br/>'),"</p>"))
@@ -810,11 +810,10 @@ server <- function(input, output) {
 
   output$gene_gene_text <- renderUI({
     req(gene_results_filtered())
-    s1 <- "Gene-gene expression correlation (spearman) of a selection of genes. The default uses the DE tophits. By using the chaining option in the Secondary Parameter section the genes shown will be filtered by the current rows shown in the DE table."
-    s1.1 <- "This can give an overview of interactions/co-expressions of the given genes."
+    s1 <- "Heatmap of gene-gene expression correlation (spearman) of a selection of genes. The default uses the DE tophits. By using the chaining option in the Secondary Parameter section the genes shown will be filtered by the current rows shown in the DE table."
+    s1.1 <- "This can give an overview of interactions/co-expressions of the given genes. By hovering over the plot you can see the values for each gene pair."
     s2 <- "You can export the figure in svg by pressing the camera symbol."
-    s3 <- "By hovering over the plot you can see the values for each gene pair."
-    HTML(paste("<p>",paste(s1,s1.1, s2, s3,sep = '<br/>'),"</p>"))
+    HTML(paste("<p>",paste(s1,s1.1,s2,sep = '<br/>'),"</p>"))
   })
 
   output$gene_sample_title <- renderUI({
@@ -858,10 +857,8 @@ server <- function(input, output) {
   output$gene_sample_text <- renderUI({
     req(gene_results_filtered())
     s0 <- "Similar to the gene-gene correlation heatmap, but this plot clusters the samples based on normalized expression values and is useful for discovering defining expression features."
-    s1 <- "Like the other heatmap, you can filter it using the chaining option."
-    s2 <- "You can export the figure in svg by pressing the camera symbol."
-    s3 <- "By hovering over the plot you can see the values for each gene pair."
-    HTML(paste("<p>",paste(s1, s0, s2, s3,sep = '<br/>'),"</p>"))
+    s1 <- "You can also filter it using the chaining option. Export the figure in svg by pressing the camera symbol."
+    HTML(paste("<p>",paste(s0, s1, sep = '<br/>'),"</p>"))
   })
 
 
