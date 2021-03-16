@@ -121,9 +121,9 @@ server <- function(input, output) {
                         checkboxInput(inputId = paste0("combined",i), label="Is combined", TRUE),
                         checkboxInput(inputId = "gene_id_col", label = "The first column has gene ids", value = F),
                         textInput(inputId = paste0("phen",i),label = "Phenotype id",value = "Case"),
-                        numericInput("group_col", "Column number for group", value = 0, min = 0, step = 1),
-                        numericInput("sample_col", "Column number for sample", value = 0, min = 0, step = 1),
-                        numericInput("batch_col", "Column number for batch, leave at zero if there is none", value = 0, min = 0, step = 1))
+                        numericInput("group_col", "Column number for group", value = 1, min = 0, step = 1),
+                        numericInput("sample_col", "Column number for sample", value = 2, min = 0, step = 1),
+                        numericInput("batch_col", "Column number for batch, leave at zero if there is none", value = 3, min = 0, step = 1))
       if(toString(i)%in%input$circRNA){
         html_ui <- paste0(html_ui, fileInput(inputId = paste0("circRNA",i), label=paste0("circRNA data ",i)))
       }
