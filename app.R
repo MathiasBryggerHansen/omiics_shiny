@@ -423,7 +423,7 @@ server <- function(input, output) {
     pheno <- input_data$inp[[paste0("pheno",1)]]
     if(input$pca_pheno > ncol(pheno)){
       showNotification("You need to specify a valid column number",type = "message")
-      ann <- pheno[[1]]
+      ann <- pheno[[input$group_col]]
     }
     else {
       ann <- factor(input$pca_pheno)
