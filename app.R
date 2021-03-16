@@ -423,12 +423,12 @@ server <- function(input, output) {
     pheno <- input_data$inp[[paste0("pheno",1)]]
     if(input$pca_pheno > ncol(pheno)){
       showNotification("You need to specify a valid column number",type = "message")
-      ann <- pheno[[input$group_col]]
+      ann <- factor(pheno[[input$group_col]])
     }
     else {
-      ann <- factor(input$pca_pheno)
+      ann <- factor(pheno[[input$pca_pheno]])
     }
-    req(input$pca_pheno > ncol(pheno))
+    req(input$pca_pheno < ncol(pheno) + 1)
     if(input[["raw_counts1"]]){
       data_norm <- gene_results_de()[["1"]][["dds"]]
       data_norm <- data.frame(assay(varianceStabilizingTransformation(data_norm)) )
@@ -445,6 +445,7 @@ server <- function(input, output) {
     df_pca  <- prcomp(t(data_norm),scale = T, center = T)
     df_out <- as.data.frame(df_pca$x)
     scores <- df_pca$x
+    print(head(scores))
     #saveRDS(scores[,1:3], file = "pca_scores")
     #saveRDS(cbind(ann,row.names(df_out)), file = "pca_ann.RDS")
     plot_ly(x=scores[,1], y=scores[,2], z=scores[,3], type = "scatter3d", mode="markers",name = row.names(df_out), color = ann) %>%
