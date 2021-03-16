@@ -85,7 +85,7 @@ server <- function(input, output) {
           mm <- model.matrix(~0+f)
         }
         temp <- voom(d0, mm)
-        res[[toString(i)]] <- limma_analysis(countdata = temp,phenotypes = pheno[[1]],design = mm)
+        res[[toString(i)]] <- limma_analysis(countdata = temp,phenotypes = pheno[[input$group_col]],design = mm)
       }
     }
     showNotification("DE analysis done, now doing secondary analysis and gaphics.",type = "message",duration = 10)
@@ -927,6 +927,9 @@ ui <- fluidPage(
       numericInput("nfiles", "Number of paired datasets", value = 1, min = 1, step = 1),
       p("The first dataset will be treated as your primary dataset"),
       numericInput("afiles", "Number of annotation datasets", value = 0, min = 0, step = 1),
+      numericInput("group_col", "Column number for group", value = 0, min = 0, step = 1),
+      numericInput("sample_col", "Column number for sample", value = 0, min = 0, step = 1),
+      numericInput("batch_col", "Column number for batch, leave at zero if there is none", value = 0, min = 0, step = 1),
       uiOutput("circRNAfiles"),
       uiOutput("fileInputs"),
 
