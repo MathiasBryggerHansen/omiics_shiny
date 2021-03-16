@@ -121,9 +121,9 @@ server <- function(input, output) {
                         checkboxInput(inputId = paste0("combined",i), label="Is combined", TRUE),
                         checkboxInput(inputId = "gene_id_col", label = "The first column has gene ids", value = F),
                         textInput(inputId = paste0("phen",i),label = "Phenotype id",value = "Case"),
-                        numericInput("group_col", "Column number for group", value = 0, min = 0, step = 1),
-                        numericInput("sample_col", "Column number for sample", value = 0, min = 0, step = 1),
-                        numericInput("batch_col", "Column number for batch, leave at zero if there is none", value = 0, min = 0, step = 1))
+                        numericInput("group_col", "Column number for group", value = 1, min = 0, step = 1),
+                        numericInput("sample_col", "Column number for sample", value = 2, min = 0, step = 1),
+                        numericInput("batch_col", "Column number for batch, leave at zero if there is none", value = 3, min = 0, step = 1))
       if(toString(i)%in%input$circRNA){
         html_ui <- paste0(html_ui, fileInput(inputId = paste0("circRNA",i), label=paste0("circRNA data ",i)))
       }
@@ -474,7 +474,7 @@ server <- function(input, output) {
 
   output$gene_results_table <- renderDataTable({
     req(gene_results())
-    saveRDS(gene_results_2(), file = "gene_results_table.RDS")
+    #saveRDS(gene_results_2(), file = "gene_results_table.RDS")
     datatable(data = gene_results_2(),caption = "DE results including any extra datasets",filter = list(position = 'top'),escape = F, options = list(autoWidth = TRUE,scrollX = TRUE, columnDefs = list(list(width = '400px', targets = grep(colnames(gene_data$df),pattern = "reactome|kegg|carta|wiki")))))
   })
 
