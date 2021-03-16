@@ -120,7 +120,10 @@ server <- function(input, output) {
                         radioButtons(paste0("sep",i), "Separator",choices = c(Comma = ",",Semicolon = ";",Tab = "\t"),selected = "\t",inline = T),
                         checkboxInput(inputId = paste0("combined",i), label="Is combined", TRUE),
                         checkboxInput(inputId = "gene_id_col", label = "The first column has gene ids", value = F),
-                        textInput(inputId = paste0("phen",i),label = "Phenotype id",value = "Case"))
+                        textInput(inputId = paste0("phen",i),label = "Phenotype id",value = "Case"),
+                        numericInput("group_col", "Column number for group", value = 0, min = 0, step = 1),
+                        numericInput("sample_col", "Column number for sample", value = 0, min = 0, step = 1),
+                        numericInput("batch_col", "Column number for batch, leave at zero if there is none", value = 0, min = 0, step = 1))
       if(toString(i)%in%input$circRNA){
         html_ui <- paste0(html_ui, fileInput(inputId = paste0("circRNA",i), label=paste0("circRNA data ",i)))
       }
@@ -927,9 +930,6 @@ ui <- fluidPage(
       numericInput("nfiles", "Number of paired datasets", value = 1, min = 1, step = 1),
       p("The first dataset will be treated as your primary dataset"),
       numericInput("afiles", "Number of annotation datasets", value = 0, min = 0, step = 1),
-      numericInput("group_col", "Column number for group", value = 0, min = 0, step = 1),
-      numericInput("sample_col", "Column number for sample", value = 0, min = 0, step = 1),
-      numericInput("batch_col", "Column number for batch, leave at zero if there is none", value = 0, min = 0, step = 1),
       uiOutput("circRNAfiles"),
       uiOutput("fileInputs"),
 
