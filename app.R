@@ -121,8 +121,8 @@ server <- function(input, output) {
                         checkboxInput(inputId = paste0("combined",i), label="Is combined", TRUE),
                         checkboxInput(inputId = "gene_id_col", label = "The first column has gene ids", value = F),
                         textInput(inputId = paste0("phen",i),label = "Phenotype id",value = "Case"),
-                        numericInput("group_col", "Column number for group", value = 1, min = 0, step = 1),
-                        numericInput("sample_col", "Column number for sample", value = 2, min = 0, step = 1),
+                        numericInput("group_col", "Column number for group", value = 2, min = 0, step = 1),
+                        numericInput("sample_col", "Column number for sample", value = 1, min = 0, step = 1),
                         numericInput("batch_col", "Column number for batch, leave at zero if there is none", value = 3, min = 0, step = 1))
       if(toString(i)%in%input$circRNA){
         html_ui <- paste0(html_ui, fileInput(inputId = paste0("circRNA",i), label=paste0("circRNA data ",i)))
@@ -141,18 +141,18 @@ server <- function(input, output) {
 
   #Creates interface to include circRNA
   output$circRNAfiles <- renderUI({
-    HTML(paste0(selectInput(inputId = "circRNA", label = "Select the datasets with paired circRNA data",multiple = T,choices = seq(1,input$nfiles))))
+    HTML(paste0(selectInput(inputId = "circRNA", label = "Select the datasets with paired circRNA data",multiple = T,choices = seq(0,input$nfiles), selected = 0, selectize=FALSE)))
   })
 
   input_data <- reactiveValues()
 
   observeEvent(input$start, {
-    input_data$inp <- input_d(input)
+    input_data$inp <- input_d(input, probe_library())
   })
 
   gene_results <- reactive({##gene_symbol
     req(gene_results_de())
-    data <- gene_results_de()[["1"]][["test"]]##c("padj",multiple "log2FoldChange","baseMean","pvalue","stat","lfcSE")
+    data <- gene_results_de()[["1"]][["test"]]##c("padj",multiple "log2Fo'ldChange","baseMean","pvalue","stat","lfcSE")
     return(annotate_results(input = input, data = data, ensembl2id = ensembl2id(), pathway_dic = pathway_dic(), circ=F))
   })
 
@@ -445,7 +445,6 @@ server <- function(input, output) {
     df_pca  <- prcomp(t(data_norm),scale = T, center = T)
     df_out <- as.data.frame(df_pca$x)
     scores <- df_pca$x
-    print(head(scores))
     #saveRDS(scores[,1:3], file = "pca_scores")
     #saveRDS(cbind(ann,row.names(df_out)), file = "pca_ann.RDS")
     plot_ly(x=scores[,1], y=scores[,2], z=scores[,3], type = "scatter3d", mode="markers",name = row.names(df_out), color = ann) %>%
@@ -932,6 +931,7 @@ ui <- fluidPage(
       p("The first dataset will be treated as your primary dataset"),
       numericInput("afiles", "Number of annotation datasets", value = 0, min = 0, step = 1),
       uiOutput("circRNAfiles"),
+      p("Leave at 0 if no datasets have circRNA data"),
       uiOutput("fileInputs"),
 
       tags$hr(),
