@@ -2,7 +2,7 @@ options(shiny.maxRequestSize = 100*1024^2)
 
 
 if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
-requiredpackages <- c("digest","heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca","devtools","SummarizedExperiment","enrichR","DT","DESeq2","scales")
+requiredpackages <- c("colorspace","digest","heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca","devtools","SummarizedExperiment","enrichR","DT","DESeq2","scales")
 
 install_load <- function(packages){
    for (p in packages) {
@@ -115,15 +115,22 @@ server <- function(input, output) {
   output$fileInputs <- renderUI({
     html_ui = " "
     for (i in 1:input$nfiles){#checkboxInput(inputId = paste0("CEL",i), label="Is CEL", FALSE),
-      html_ui <- paste0(html_ui, fileInput(paste0("count",i), label=paste0("count data ",i)), fileInput(paste0("phenotype",i),
-                                                                                                        label=paste0("phenotype data ",i)), checkboxInput(inputId = paste0("raw_counts",i), label="Is raw counts", TRUE),
-                        radioButtons(paste0("sep",i), "Separator",choices = c(Comma = ",",Semicolon = ";",Tab = "\t"),selected = "\t",inline = T),
+      html_ui <- paste0(html_ui, fileInput(paste0("count",i), label=paste0("count data ",i)),
+                        checkboxInput(inputId = paste0("raw_counts",i), label="Is raw counts", TRUE),
                         checkboxInput(inputId = paste0("combined",i), label="Is combined", TRUE),
-                        checkboxInput(inputId = "gene_id_col", label = "The first column has gene ids", value = F),
+                        p("Is the data separate for each sample or combined in one single file?"),
+                        checkboxInput(inputId = "gene_id_col", label = "The first column has gene IDs", value = F),
+                        p("Not relevant if the names are given in the rows of the dataset."),
+                        fileInput(paste0("phenotype",i),label=paste0("metadata ",i)),
+                        radioButtons(paste0("sep",i), "Separator",choices = c(Comma = ",",Semicolon = ";",Tab = "\t"),selected = "\t",inline = T),
                         textInput(inputId = paste0("phen",i),label = "Phenotype id",value = "Case"),
+                        p("This is used for headers and graphs as the defining name."),
                         numericInput("group_col", "Column number for group", value = 2, min = 0, step = 1),
                         numericInput("sample_col", "Column number for sample", value = 1, min = 0, step = 1),
-                        numericInput("batch_col", "Column number for batch, leave at zero if there is none", value = 3, min = 0, step = 1))
+                        numericInput("batch_col", "Column number for batch, leave at zero if there is none", value = 3, min = 0, step = 1),
+                        p("Select the correct column numbers in the metadata."))
+
+
       if(toString(i)%in%input$circRNA){
         html_ui <- paste0(html_ui, fileInput(inputId = paste0("circRNA",i), label=paste0("circRNA data ",i)))
       }
@@ -223,14 +230,14 @@ server <- function(input, output) {
 
   output$FC_data_title_cancer <- renderUI({
     req(gene_results(),input$use_cancer)
-    HTML(paste(" ",h3("logFC data in cancer"),sep = '<br/>'))
+    HTML(paste(" ",h3("Fold change data from different cancer types"),sep = '<br/>'))
   })
 
   output$FC_data_text_cancer <- renderUI({
     req(gene_results(),input$use_cancer)
     s1 <- "This table shows log2(fold change) from a selection of datasets from cancer types."
-    s2 <- "You can filter on the values at the top, both by values and on gene id."
-    s3 <- "If you select and highlight a number of genes, an enrichment test will run on the subset."
+    s2 <- "&#9;You can filter on the values at the top, both by values and on gene id."
+    s3 <- "&#9;If you select and highlight a number of genes, an enrichment test will run on the subset."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
 
@@ -264,8 +271,8 @@ server <- function(input, output) {
   output$FC_data_text_neuro <- renderUI({
     req(gene_results(),input$use_neuro)
     s1 <- "This table shows log2(fold change) from a selection of datasets in neuronal diseases."
-    s2 <- "You can filter on the values at the top, both by values and on gene id."
-    s3 <- "If you select and highlight a number of genes, an enrichment test will run on the subset."
+    s2 <- "   You can filter on the values at the top, both by values and on gene id."
+    s3 <- "   If you select and highlight a number of genes, an enrichment test will run on the subset."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
 
@@ -322,7 +329,7 @@ server <- function(input, output) {
   output$string_db_enr_text <- renderUI({
     req(gene_results_filtered())
     s1 <- "This table shows a summary of a protein interaction enrichment analysis in the string database for protein interactions."
-    s3 <- "Similarly to the other enrichment analysis, by selecting columns with your cursor, you filter on the proteins shown in the Stringdb network below."
+    s3 <- "   Similarly to the other enrichment analysis, by selecting columns with your cursor, you filter on the proteins shown in the Stringdb network below."
     HTML(paste("<p>",paste(s1,s3,sep = '<br/>'),"</p>"))
   })
   string_db_results <- reactive({
@@ -346,12 +353,12 @@ server <- function(input, output) {
 
   output$volcano_text <- renderUI({
     req(gene_results_filtered())
-    s0 <- "The volcano plot shows a summary of the differential expression regression analysis. Only 10 percent on non-significant genes are plotted. You can adjust the probability and fold cutoff in the input section."
-    s1 <- "The plot can be colored by typing a search term for a given column in one of the text boxes to the left. You can use .* to indicate wildcards. In the Post Analysis you can run a K-means clustering algorithm, and annotate the plot with the clusters. Only the significant genes are included in the clustering."
-    s3 <- "You can also export the figure in svg by pressing the camera symbol in the top right corner. If you click on items in the legend they are removed from view."
-    s2 <- "You can interact with the plot to zoom in on an area when the zoom option is selected, and you can select datapoints of interest. This will show details on the specific genes, and a boxplot will be plotted showing normalized gene expressions."
+    s0 <- "The volcano plot shows a summary of the differential expression regression analysis. Only 10 percent on non-significant genes are plotted. You can adjust the probability and fold cutoff in the buttom of the Upload Data section, also after the analysis."
+    s1 <- "&#9;The plot can be colored by typing a search term for a given column in one of the text boxes to the left, see (2). You can use .* to indicate wildcards (one or more characters of any type). In the Post Analysis you can run a K-means clustering algorithm, and annotate the plot with the clusters. Only the significant genes are included in the clustering."
+    s3 <- "&#9;By hovering your curser over the plot, you will see different options of graph interaction in the top right corner - this is the case for all plots. You can export the figure in svg by clicking on the camera symbol. If you click on items in the legend they are removed from view, you can also doubleclick to exclude everything but the given type, doubleclick again to reverse."
+    s2 <- "&#9;You can interact with the plot to zoom in on an area when the zoom option is selected, and you can choose the 'box select'/'lasso select' to select datapoints of interest. This will show details on the specific genes, and a boxplot will be plotted below showing normalized gene expressions."
 
-    HTML(paste("<p>",paste(s0,s1, s2, s3, sep = '<br/>'),"</p>"))
+    HTML(paste("<p>",paste(s0,s1, s3, s2, sep = '<br/>'),"</p>"))
   })
 
   output$volcano <- renderPlotly({
@@ -366,10 +373,10 @@ server <- function(input, output) {
 
   output$volcano_text_circ <- renderUI({
     req(gene_results_filtered_circ(),!is.null(input_data$inp[[paste0("circRNA",1)]]))
-    s0 <- "The volcano plot shows a summary of the differential expression regression analysis."
-    s1 <- "The plot can be colored by typing a search term for a given column in one of the text boxes to the left."
-    s3 <- "You can also export the figure in svg by pressing the camera symbol in the top right corner. If you click on items in the legend they are removed from view."
-    s2 <- "You can interact with the plot to zoom in on an area when the zoom option is selected, and you can select datapoints of interest. This will show details on the specific genes, and a boxplot will be plotted showing normalized gene expressions."
+    s0 <- "The volcano plot shows a summary of the differential expression regression analysis. Only 10 percent on non-significant genes are plotted. You can adjust the probability and fold cutoff in the input section."
+    s1 <- "   The plot can be colored by typing a search term for a given column in one of the text boxes to the left, see (2). You can use .* to indicate wildcards (one or more characters of any type). In the Post Analysis you can run a K-means clustering algorithm, and annotate the plot with the clusters. Only the significant genes are included in the clustering."
+    s3 <- "   You can also export the figure in svg by clicking on the camera symbol in the top right corner. If you click on items in the legend they are removed from view."
+    s2 <- "   You can interact with the plot to zoom in on an area when the zoom option is selected, and you can choose the 'box select'/'lasso select' to select datapoints of interest. This will show details on the specific genes, and a boxplot will be plotted showing normalized gene expressions."
 
     HTML(paste("<p>",paste(s0,s1, s2, s3, sep = '<br/>'),"</p>"))
   })
@@ -413,15 +420,21 @@ server <- function(input, output) {
   output$pca_text <- renderUI({
     req(gene_results())
     s1 <- "The PCA plot shows the first three principle components discriminating each sample."
-    s2 <- "By using your scroll, you can zoom in and out and clicking and dragging the cursor will rotate the view."
-    s3 <- "You can export the figure when you have found a fitting angle by clicking the photo symbol in the upper corner."
+    s2 <- "   By using your scroll, you can zoom in and out and clicking and dragging the cursor will rotate the view."
+    s3 <- "   You can export the figure when you have found a fitting angle by clicking the photo symbol in the upper corner."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
 
   output$pca <- renderPlotly({
     req(gene_results_de())
     pheno <- input_data$inp[[paste0("pheno",1)]]
-    if(input$pca_pheno > ncol(pheno)){
+    print(ncol(pheno))
+    print(input$group_col)
+    if(is.null(input$pca_pheno)){
+      showNotification("You need to specify a valid column number",type = "message")
+      ann <- factor(pheno[[input$group_col]])
+    }
+    else if(input$pca_pheno > ncol(pheno)){
       showNotification("You need to specify a valid column number",type = "message")
       ann <- factor(pheno[[input$group_col]])
     }
@@ -447,7 +460,7 @@ server <- function(input, output) {
     scores <- df_pca$x
     #saveRDS(scores[,1:3], file = "pca_scores")
     #saveRDS(cbind(ann,row.names(df_out)), file = "pca_ann.RDS")
-    plot_ly(x=scores[,1], y=scores[,2], z=scores[,3], type = "scatter3d", mode="markers",name = row.names(df_out), color = ann) %>%
+    plot_ly(x=scores[,1], y=scores[,2], z=scores[,3], type = "scatter3d", mode="markers",name = row.names(df_out), color = ann, colors = rainbow_hcl(length(unique(ann)))) %>%
       layout(scene = list(xaxis = list(title = "PC1"), yaxis = list(title = "PC2"), zaxis = list(title = "PC3"))) %>%
       config(
         toImageButtonOptions = list(
@@ -461,26 +474,26 @@ server <- function(input, output) {
 
   output$gene_results_title <- renderUI({
     req(gene_results())
-    HTML(paste(" ", h3("Table of DE results"), sep = '<br/>'))
+    HTML(paste(" ", h3("Table of results of the Differential Anlysis"), sep = '<br/>'))
   })
   output$gene_results_text <- renderUI({
     req(gene_results())
-    s1 <- "The DE results table includes analysis results of differential expression along with annotation."
-    s2 <- "It can be filtered by setting filter parameters for each column or globally. You can for example change the range of log2FoldChange or search for a pathway of interest."
-    s3 <- "The table can also be filtered by inserting a list comma separated gene IDs (ensembl or hgnc symbol) in the Post Analysis section. This will search for protein interactions with the given genes, and filter on that given list. Non-matching IDs are ignored."
-    s4 <- "You can add new datasets by searching the Atlas Database in the Post Analysis. These can be plotted or used as annotation."
+    s1 <- "The DE results table includes analysis results of differential expression along with annotation. The pathway annotation is from different curated databases."
+    s2 <- "   It can be filtered on columns by setting filter parameters for each column or by using the global searchfield. You can for example change the range of log2FoldChange or search for a pathway of interest."
+    s3 <- "   The table can also be filtered according to protein interactions by inserting a list of comma separated gene IDs (Ensembl or HGNC symbol) in the Post Analysis section, see (3). This will search for protein interactions with the given genes, and filter on that given list. Non-matching IDs are ignored."
+    s4 <- "   You can add new datasets by searching the Atlas Database in the Post Analysis, see (4). You can plot them in the Volcano Plot, see (5), or use them as annotation."
     HTML(paste("<p>",paste(s1, s2, s3, s4,sep = '<br/>'),"</p>"))
   })
 
   output$gene_results_table <- renderDataTable({
     req(gene_results())
     #saveRDS(gene_results_2(), file = "gene_results_table.RDS")
-    datatable(data = gene_results_2(),caption = "DE results including any extra datasets",filter = list(position = 'top'),escape = F, options = list(autoWidth = TRUE,scrollX = TRUE, columnDefs = list(list(width = '400px', targets = grep(colnames(gene_data$df),pattern = "reactome|kegg|carta|wiki")))))
+    datatable(data = gene_results_2(),filter = list(position = 'top'),escape = F, options = list(autoWidth = TRUE,scrollX = TRUE, columnDefs = list(list(width = '400px', targets = grep(colnames(gene_data$df),pattern = "reactome|kegg|carta|wiki")))))
   })
 
   output$gene_results_table_circ <- renderDataTable({
     req(gene_results_circ())
-    datatable(data = gene_results_circ(),caption = "DE results including any extra datasets",filter = list(position = 'top'),escape = F, options = list(autoWidth = TRUE,scrollX = TRUE, columnDefs = list(list(width = '400px', targets = grep(colnames(gene_data$df),pattern = "reactome|kegg|carta|wiki")))))
+    datatable(data = gene_results_circ(),filter = list(position = 'top'),escape = F, options = list(autoWidth = TRUE,scrollX = TRUE, columnDefs = list(list(width = '400px', targets = grep(colnames(gene_data$df),pattern = "reactome|kegg|carta|wiki")))))
   })
 
 
@@ -505,14 +518,14 @@ server <- function(input, output) {
 
   output$sign_pheno_exp_title <- renderUI({
     req(gene_results_filtered())
-    HTML(paste(" ", h3("Table of matching datasets in the Expression Atlas database according to significant hits"), sep = '<br/>'))
+    HTML(paste(" ", h3("External experiments with similar expression patterns"), sep = '<br/>'))
   })
 
   output$sign_pheno_exp_text <- renderUI({
     req(gene_results())
     s1 <- "This table shows datasets from the Expression Atlas database that are significantly correlated with the primary dataset."
-    s2 <- "You can include one or more of the datasets by inserting their IDs comma seperated in one of the search fields to the left. Follow the link for more information of the given dataset."
-    s3 <- "The added datasets can for example be used to annotate your primary dataset, or you can create a new volcano plot with the input."
+    s2 <- "   You can include one or more of the datasets by inserting their IDs comma seperated in one of the search fields to the left. Follow the link for more information of the given dataset."
+    s3 <- "   The added datasets can for example be used to annotate your primary dataset, or you can create a new volcano plot with the input."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
   output$sign_pheno_exp <- renderDataTable({#gene_filtered <- gene_results_filtered()[gene_results_filtered()$padj < eval(parse(text = input$p)) & !is.na(gene_results_filtered()$padj) & abs(gene_results_filtered()$log2FoldChange) > log2(input$fc),]
@@ -544,9 +557,9 @@ server <- function(input, output) {
   })
   output$heatmap_cancer_cor_text <- renderUI({
     req(gene_results(),input$use_cancer)
-    s1 <- "This heatmap shows a collective selection of datasets, showing significant fold change in a subset of genes."
-    s2 <- "Non-significant and missing values are set to zero. The fold change values are capped at 3 to give a better visual interpretation."
-    s3 <- "You can always hover your cursor over a datapoint to get information about the x and y axis."
+    s1 <- "This heatmap shows a collection of datasets involved with cancer, showing significant fold change in a subset of genes."
+    s2 <- "Non-significant and missing values are set to zero. The log2(fold change) values are capped at 3 to give a better visual interpretation. By using the chaining option, see (1), this heatmap is filtered according to the FC cance data table."
+    s3 <- "You can always hover your cursor over a datapoint to get information about the gene and specific disease."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
 
@@ -570,7 +583,7 @@ server <- function(input, output) {
     canc_FC[canc_FC>3] <- 3
     canc_FC[canc_FC<(-3)] <- -3
     if(input$chain){
-      canc_FC <- canc_FC[input$FC_d_cancer_rows_all[1:100],]
+      canc_FC <- canc_FC[input$FC_d_cancer_rows_current,]
     }
     else{
       canc_FC <- canc_FC[order(rowSums(abs(canc_FC),na.rm = T),decreasing = T)[1:100],]
@@ -594,8 +607,8 @@ server <- function(input, output) {
   output$heatmap_neuro_cor_text <- renderUI({
     req(gene_results(),input$use_neuro)
     s1 <- "This heatmap shows a collective selection of datasets, showing significant fold change in a subset of genes."
-    s2 <- "Non-significant and missing values are set to zero. The fold change values are capped at 3 to give a better visual interpretation."
-    s3 <- "You can always hover your cursor over a datapoint to get information about the x and y axis."
+    s2 <- "   Non-significant and missing values are set to zero. The log2(fold change) values are capped at 3 to give a better visual interpretation."
+    s3 <- "   You can always hover your cursor over a datapoint to get information about the the gene and the specific phenotype."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
 
@@ -619,7 +632,7 @@ server <- function(input, output) {
     neuro_FC[neuro_FC>3] <- 3
     neuro_FC[neuro_FC<(-3)] <- -3
     if(input$chain){
-      neuro_FC <- neuro_FC[input$FC_d_neuro_rows_all[1:100],]
+      neuro_FC <- neuro_FC[input$FC_d_neuro_rows_current,]
     }
     else{
       neuro_FC <- neuro_FC[order(rowSums(abs(neuro_FC),na.rm = T),decreasing = T)[1:100],]
@@ -687,8 +700,8 @@ server <- function(input, output) {
     output$boxplot_search_text <- renderUI({
       req(gene_results_filtered())
       s1 <- "The boxplot shows the expression of the genes selected."
-      s2 <- "By hovering your cursor over the plot you can see the values for each gene."
-      s3 <- "You can export the figure in svg by pressing the camera symbol."
+      s2 <- "   By hovering your cursor over the plot you can see the values for each gene, and the options for interaction in the top right corner."
+      s3 <- "   You can export the figure in svg by clicking on the camera symbol."
       HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
     })
 
@@ -760,8 +773,8 @@ server <- function(input, output) {
   output$sign_pathways_text <- renderUI({
     req(gene_results_filtered())
     s1 <- "This table shows a summary of a pathway/functional enrichment analysis including GO molecular function, GO cellular function and Reactome and KEGG pathways."
-    s2 <- "You can search for a given GO, pathway or related phenotype in the search field. The table can be downloaded at the bottom of the Post Analysis section."
-    s3 <- "By selecting columns with your cursor, you filter on the proteins shown in the Stringdb network below."
+    s2 <- "   You can search for a given GO, pathway or related phenotype in the search field. The table can be downloaded at the bottom of the Post Analysis section."
+    s3 <- "   By selecting columns with your cursor, you filter on the proteins shown in the Stringdb network below."
     HTML(paste("<p>",paste(s1, s2,s3,sep = '<br/>'),"</p>"))
   })
 
@@ -813,9 +826,9 @@ server <- function(input, output) {
 
   output$gene_gene_text <- renderUI({
     req(gene_results_filtered())
-    s1 <- "Heatmap of gene-gene expression correlation (spearman) of a selection of genes. The default uses the DE tophits. By using the chaining option in the Secondary Parameter section the genes shown will be filtered by the current rows shown in the DE table."
-    s1.1 <- "This can give an overview of interactions/co-expressions of the given genes. By hovering over the plot you can see the values for each gene pair."
-    s2 <- "You can export the figure in svg by pressing the camera symbol."
+    s1 <- "Heatmap of gene-gene expression correlation (spearman) of a selection of genes. The default uses the DE tophits. By using the chaining option in the Secondary Parameter section, see (1), the genes shown will be filtered by the current rows shown in the DE table."
+    s1.1 <- "   This can give an overview of interactions/co-expressions of the given genes. By hovering over the plot you can see the values for each gene pair."
+    s2 <- "   You can export the figure in svg by clikcing on the camera symbol."
     HTML(paste("<p>",paste(s1,s1.1,s2,sep = '<br/>'),"</p>"))
   })
 
@@ -860,7 +873,7 @@ server <- function(input, output) {
   output$gene_sample_text <- renderUI({
     req(gene_results_filtered())
     s0 <- "Similar to the gene-gene correlation heatmap, but this plot clusters the samples based on normalized expression values and is useful for discovering defining expression features."
-    s1 <- "You can also filter it using the chaining option. Export the figure in svg by pressing the camera symbol."
+    s1 <- "   You can also filter it using the chaining option, see (1). Export the figure in svg by clicking on the camera symbol."
     HTML(paste("<p>",paste(s0, s1, sep = '<br/>'),"</p>"))
   })
 
@@ -902,8 +915,8 @@ server <- function(input, output) {
   output$stringdb_text <- renderUI({
     req(gene_results())
     s1 <- "String db protein interaction network, as default this will include all the significant hits."
-    s2 <- "If you click the STRING button, your work will be lost, and you will go to the STRINGdb browser for the network."
-    s3 <- "You can drag the proteins around as you please. By click a protein you can see the structure along with further information."
+    s2 <- "   If you click the STRING button, your work will be lost, and you will go to the STRINGdb browser for the network."
+    s3 <- "   You can drag the proteins around as you please. By click a protein you can see the structure along with further information."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
 
@@ -911,14 +924,6 @@ server <- function(input, output) {
     req(gene_results())
     HTML(paste(" ",h3("Stringdb network"), sep = '<br/>'))
   })
-
-  #output$getPath <- getPathway('WP554')
-  #output$reactome <- renderPlot({
-
-  #  fc <- gene_results_de()$log2FoldChange[!duplicated(gene_results_de()$ENTREZID)]
-  #  names(fc) <- gene_results_de()$ENTREZID[!duplicated(gene_results_de()$ENTREZID)]
-  #  viewPathway("mRNA Splicing - Major Pathway", readable=TRUE, foldChange = fc) #it quickly becomes chaotic, with too many interactions
-  #})
 
 }
 
@@ -928,54 +933,61 @@ ui <- fluidPage(
     sidebarPanel(
       h2("Data Upload"),
       numericInput("nfiles", "Number of paired datasets", value = 1, min = 1, step = 1),
-      p("The first dataset will be treated as your primary dataset"),
+      p("Paired datasets are RNA expression count data and metadata for a given experiment. The first pair will be treated as your primary data"),
       numericInput("afiles", "Number of annotation datasets", value = 0, min = 0, step = 1),
+      p("Annotation datasets annotate each sample. It requires the column of sample IDs and one or more annotation column(s)."),
       uiOutput("circRNAfiles"),
-      p("Leave at 0 if no datasets have circRNA data"),
+      p("Leave at 0 if no datasets have circRNA data."),
       uiOutput("fileInputs"),
 
       tags$hr(),
       #checkboxGroupInput(inputId = "dbs", "Pathways to use in enrichment analysis:",c("GO Molecular Function" = "GO_Molecular_Function_2018","GO Cellular Component"="GO_Cellular_Component_2018","KEGG"="KEGG_2019_Human","Reactome"="Reactome_2016"),selected = "KEGG_2019_Human"),
       radioButtons("species", "Species",choices = c(human = "human",mouse = "mouse"),selected = "human",inline = T),
       checkboxInput(inputId = "batch_correction", label = "Use batch correction", value = F),
-      p("This requires a batch annotation in the third column of the phenotype data"),
+      p("This requires batch annotation in the metadata."),
       checkboxInput(inputId = "gene_filter", label = "Use filter to pre-exclude genes with no variance in expression", value = T),
-      textInput(inputId = "p", label = "p cutoff:",value = '10**-14'),
+      textInput(inputId = "p", label = "p cutoff:",value = '10^-14'),
       numericInput(inputId = "fc", label = "FC cutoff:", value = 2),
 
       tags$hr(),
       h2("Secondary Parameters"),
-      checkboxInput(inputId = "use_cancer", label = "Use summary stats from cancers", value = F),
-      checkboxInput(inputId = "use_neuro", label = "Use summary stats from neurological diseases", value = F),
-      checkboxInput(inputId = "chain", label = "Chain output with filtered table", value = F),
-      textInput(inputId = "experiment_id", label = "Use alternative dataset for volcano plot", value = ""),
-      textInput(inputId = "volcano_col", label = "A column to annotate color in volcano plot",value = "gene_biotype"),
+      checkboxInput(inputId = "use_cancer", label = "Use summary statistics from cancers", value = F),
+      checkboxInput(inputId = "use_neuro", label = "Use summary statistics from neurological diseases", value = F),
+      p("These are curated datasets where fold change values are only included (otherwise set as NA) for significantly differentially expressed genes for each experiment. The data will be shown in tables and visualized as heatmaps"),
+      checkboxInput(inputId = "chain", label = "(1) Chain graphs with filtered table", value = F),
+      p("Chaining will select the genes which are currently showing in the relevant tables and show them on the heatmaps."),
+      p("Type ID of the dataset you wish to plot."),
+      textInput(inputId = "volcano_col", label = "(2) A column to annotate color in the volcano plot",value = "gene_biotype"),
+      p("Type in a search term matching a parameter you wish to annotate with."),
       textInput(inputId = "col_high", label = "Color of continuous high values", value = "red"),
       textInput(inputId = "col_low", label = "Color of continuous low values", value = "blue"),
+      p("This will not affect parameters that are not continous."),
+      checkboxInput(inputId = "log_scale", label = "Scale color values for the Volcano Plot", value = FALSE),
       numericInput(inputId = "pca_pheno", label = "PCA annotation column", value = 1),
       checkboxInput(inputId = "cor_abs", label = "Absolute correlation values", value = FALSE),
-      checkboxInput(inputId = "log_scale", label = "Scale color values", value = FALSE),
+      p("This affects the gene-gene interaction heatmap. If selected the sign of the values are not considdered."),
       actionButton(inputId = "start", label = "Start Analysis!"),
 
       tags$hr(),
       h2("Post Analysis"),
-      numericInput(inputId = "k_cluster", label = "Kmeans clustering", value = 6),
-      actionButton(inputId = "k_cluster_run", label = "Run kmeans cluster!"),
-      textInput("gene_interaction", label = "Comma separated gene ids for Stringdb interaction search",value = ""),
-      #actionButton(inputId = "string_gene_filter", label = "Filter on gene ids!"),
-      textInput("atlas_query", label = "Enter Atlas phenotype query", value = ""),
-      p("Search ebi expression atlas for data related to the search term"),
+      numericInput(inputId = "k_cluster", label = "K-means clustering", value = 6),
+      actionButton(inputId = "k_cluster_run", label = "Run K-means cluster!"),
+      p("Running the K-means clustering will add a column to the DE results table, grouping the genes into k groups, using the expression values for the significant hits. You can annotate the Volcano Plot with these groups see (1)."),
+      textInput("gene_interaction", label = "(3) Comma separated gene IDs (Ensembl or HGNC) for Stringdb interaction search",value = ""),
+      p("This search term will use the Stringdb protein interaction database to only include genes in the DE analysis table that are known to interact with the given genes."),
+      textInput("atlas_query", label = "(4) Enter Atlas phenotype query", value = ""),
+      p("Search EBI Expression Atlas for data related to the search term."),
       actionButton(inputId = "Atlas_search", label = "Search Atlas database!"),
       textInput("Atlas_ids", label = "Enter Atlas ids", value = ""),
-      p("Comma separated ebi dataset IDs"),
+      p("Search for datasets related to specific EBI comma-separated IDs."),
+      p("Both of the above options will download the data and analyze it and then include it in your DE analysis results table."),
       actionButton(inputId = "Atlas_run", label = "Add Atlas dataset(s)!"),
-
+      textInput(inputId = "experiment_id", label = "(5) Use alternative dataset for Volcano Plot", value = ""),
+      p("If you have multiple analysis results added to the table, you can search for the experiment ID, and the data will be plotted instead."),
       tags$hr(),
-      downloadButton(outputId = "significant_genes", label = "Download DE genes"),
-      #downloadButton(outputId = "volcano_out",label = "Download volcano plot"),
+      downloadButton(outputId = "significant_genes", label = "Download DE gene table"),
       downloadButton(outputId = "enrichment_analysis",label = "Download enrichment analysis"),
       downloadButton(outputId = "download_filtered",label = "Download filtered gene table"),
-      #downloadButton(outputId = "string_db",label = "Download stringdb network")
     ),
     #####################################
     # Main panel for displaying outputs ----
