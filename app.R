@@ -46,51 +46,120 @@ server <- function(input, output) {
   dbs <- c("GO_Molecular_Function_2018","GO_Cellular_Component_2018","KEGG_2019_Human","Reactome_2016")
 
   #Runs count2deseq_analysis() or limma_analysis() for the data inputs.
+
+  updateResults <- function(pheno, control, case, res, isDeseq = T){
+    res$phenotypes <- relevel(res$phenotypes, control)
+    phenotypes <- factor(pheno[[input[[paste0("group_col",1)]]]])
+    print(phenotypes)
+    print(control)
+    cases <- as.vector(unlist(phenotypes[!phenotypes%in%control]))
+    print(cases)
+    print(str(cases))
+    if(isDeseq){
+      for(i in unique(cases)){
+        print(i)
+        test <- DESeq2::results(res,contrast = c("phenotypes",i,control))
+        if(!exists("de_res")){
+          if(length(unique(cases)) == 1){
+            de_res <- test
+            colnames(de_res) <- c("baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
+            de_res <- de_res[,c("baseMean","log2FoldChange","padj")]
+            de_res$ensembl_gene_id <- row.names(de_res)
+          }
+          if (i == case){
+            de_res <- test[,c("baseMean","log2FoldChange","padj")]
+            colnames(de_res) <- c("baseMean",paste0("log2FoldChange"),paste0("padj"))
+            de_res$ensembl_gene_id <- row.names(de_res)
+          }
+          else{
+            de_res <- test[,c("baseMean","log2FoldChange","padj")]
+            colnames(de_res) <- c("baseMean",paste0("log2FoldChange_",i),paste0("padj_",i))
+            de_res$ensembl_gene_id <- row.names(de_res)
+          }
+        }
+        else {
+          if (i == case){
+            de_res <- test[,c("baseMean","log2FoldChange","padj")]
+            colnames(de_res) <- c("baseMean",paste0("log2FoldChange"),paste0("padj"))
+            de_res$ensembl_gene_id <- row.names(de_res)
+          }
+          else {
+            colnames(test) <- c("baseMean",paste0("log2FoldChange_",i),"lfcSE","stat","pvalue",paste0("padj_",i))
+            test <- test[,c(paste0("log2FoldChange_",i),paste0("padj_",i))]
+            test$ensembl_gene_id <- row.names(test)
+            de_res <- merge(de_res, test, by = "ensembl_gene_id")
+          }
+        }
+      }
+      return(de_res)
+    }
+  }
+
   gene_results_de <- reactive({
     req(input_data$inp)
-    showNotification("DE analysis is running...",type = "message",duration = 10)
-    res <- list()
-    files <- input_data$inp
-    for (i in 1:input$nfiles){
-      counts <- files[[paste0("count",i)]]
-      pheno <- files[[paste0("pheno",i)]]
-      circ <- files[[paste0("circRNA",i)]]
-      pheno[[2]] <- NULL
-      ids <- row.names(counts)
+    input$start
+    isolate({
+      showNotification("DE analysis is starting...",type = "message",duration = 5)
+      res <- list()
+      files <- input_data$inp
+      for (i in 1:input$nfiles){
+        counts <- files[[paste0("count",i)]]
+        pheno <- files[[paste0("pheno",i)]]
+        circ <- files[[paste0("circRNA",i)]]
 
-      if(!grepl(ids[1],pattern = "ENS")){
-        ids <- probe_library()$ensembl_gene_id[match(x = ids, probe_library()$probe)]
-      }
-      row.names(counts) <- make.names(ids,unique = T)
-      if(!is.null(circ)){
-        res[[paste0("circRNA",toString(i))]] <- de_circ(data = circ,pheno = pheno,i = i)
-      }
+        control <- isolate(input[[paste0("control",i)]]) #this needs to be adjusted if there are multiple files?
+        case <- isolate(input[[paste0("case",i)]])
+        phenotypes <- factor(pheno[[input[[paste0("group_col",i)]]]])
+        if(!control%in%phenotypes){
+          showNotification(paste0("Your control group must match one group ID (",paste(phenotypes, collapse = ", "),")"),type = "message")
+        }
+        if(!case%in%phenotypes){
+          showNotification(paste0("Your case group must match one group ID (",paste(phenotypes, collapse = ", "),")"),type = "message")
+        }
+        req(control%in%phenotypes, case%in%phenotypes)
 
-      if(input[[paste0("raw_counts",i)]]){
-        res[[toString(i)]] <- count2deseq_analysis(input, countdata = counts, pheno = pheno)
+        #pheno[[2]] <- NULL
+        ids <- row.names(counts)
+
+        if(!grepl(ids[1],pattern = "ENS")){
+          ids <- probe_library()$ensembl_gene_id[match(x = ids, probe_library()$probe)]
+        }
+        row.names(counts) <- make.names(ids,unique = T)
+        if(!is.null(circ)){
+          res[[paste0("circRNA",toString(i))]] <- de_circ(data = circ,pheno = pheno,i = i)
+        }
+
+        if(input[[paste0("raw_counts",i)]]){
+          print("her")
+          res[[toString(i)]] <- count2deseq_analysis(input, countdata = counts, pheno = pheno, i = i)
+        }
+        else {
+          d0 <- DGEList(assays(temp)$counts)
+          if(input$gene_filter){
+            d0 <- d0[filterByExpr(d0, group=pheno),, keep.lib.sizes=FALSE]
+          }
+          d0 <- calcNormFactors(d0, method = "TMM")# #TMM normalization #assays(counts) - only from atlas
+          #counts <- cpm(counts,log = T)
+          f <- factor(pheno[[input$group_col1]], levels=unique(pheno[[input$group_col1]]))
+          if(input$batch_correction){
+            batch <- pheno[[input$batch_col]]
+            mm <- model.matrix(~batch+f)
+          }
+          else{
+            mm <- model.matrix(~0+f)
+          }
+          temp <- voom(d0, mm)
+          res[[toString(i)]] <- limma_analysis(countdata = temp,phenotypes = pheno[[input$group_col1]],design = mm)
+        }
       }
-      else {
-        d0 <- DGEList(assays(temp)$counts)
-        if(input$gene_filter){
-          d0 <- d0[filterByExpr(d0, group=pheno),, keep.lib.sizes=FALSE]
-        }
-        d0 <- calcNormFactors(d0, method = "TMM")# #TMM normalization #assays(counts) - only from atlas
-        #counts <- cpm(counts,log = T)
-        f <- factor(pheno[[1]], levels=unique(pheno[[1]]))#phenotypes[[1]]
-        if(input$batch_correction){
-          batch <- pheno[[3]]
-          mm <- model.matrix(~batch+f)
-        }
-        else{
-          mm <- model.matrix(~0+f)
-        }
-        temp <- voom(d0, mm)
-        res[[toString(i)]] <- limma_analysis(countdata = temp,phenotypes = pheno[[input$group_col]],design = mm)
-      }
-    }
-    showNotification("DE analysis done, now doing secondary analysis and gaphics.",type = "message",duration = 10)
-    return(res)
-  })
+      showNotification("DE analysis done, now doing secondary analysis and gaphics.",type = "message",duration = 10)
+      return(res)
+      })
+    })
+
+  # dds_data <- reactive({
+  #   dds <- DESeq2::DESeq(dds)
+  # })
 
   ############################################################################################################
 
@@ -108,10 +177,6 @@ server <- function(input, output) {
     write.table(enrich_out(), file, row.names = FALSE,sep = "\t",quote = F)
   })
 
-  observeEvent(input$start, {
-    showNotification("Analysis will be running for some seconds...",type = "message",duration = 10)
-  })
-
   output$fileInputs <- renderUI({
     html_ui = " "
     for (i in 1:input$nfiles){#checkboxInput(inputId = paste0("CEL",i), label="Is CEL", FALSE),
@@ -119,15 +184,17 @@ server <- function(input, output) {
                         checkboxInput(inputId = paste0("raw_counts",i), label="Is raw counts", TRUE),
                         checkboxInput(inputId = paste0("combined",i), label="Is combined", TRUE),
                         p("Is the data separate for each sample or combined in one single file?"),
+                        textInput(inputId = paste0("control",i), label="ID of control", value = "control"),
+                        textInput(inputId = paste0("case",i), label="ID of primary case", value = "case"),
                         checkboxInput(inputId = "gene_id_col", label = "The first column has gene IDs", value = F),
                         p("Not relevant if the names are given in the rows of the dataset."),
                         fileInput(paste0("phenotype",i),label=paste0("metadata ",i)),
                         radioButtons(paste0("sep",i), "Separator",choices = c(Comma = ",",Semicolon = ";",Tab = "\t"),selected = "\t",inline = T),
                         textInput(inputId = paste0("phen",i),label = "Phenotype id",value = "Case"),
                         p("This is used for headers and graphs as the defining name."),
-                        numericInput("group_col", "Column number for group", value = 2, min = 0, step = 1),
-                        numericInput("sample_col", "Column number for sample", value = 1, min = 0, step = 1),
-                        numericInput("batch_col", "Column number for batch, leave at zero if there is none", value = 3, min = 0, step = 1),
+                        numericInput(paste0("group_col",i), "Column number for group", value = 2, min = 0, step = 1),
+                        numericInput(paste0("sample_col",i), "Column number for sample", value = 1, min = 0, step = 1),
+                        numericInput(paste0("batch_col",i), "Column number for batch, leave at zero if there is none", value = 3, min = 0, step = 1),
                         p("Select the correct column numbers in the metadata."))
 
 
@@ -154,20 +221,24 @@ server <- function(input, output) {
   input_data <- reactiveValues()
 
   observeEvent(input$start, {
+    showNotification("Analysis will be running for some seconds...",type = "message",duration = 5)
     input_data$inp <- input_d(input, probe_library())
+    gene_data$df <- gene_results()
+    print("input done")
+  })
+
+  observeEvent(input$update, {
+    req(gene_results())
+    gene_results_de()[["1"]][["test"]] <- updateResults(pheno = input_data$inp[[paste0("pheno",1)]], case = input$case1, control = input$control1, res = gene_results_de()[["1"]][["dds"]], isDeseq = T)
   })
 
   gene_results <- reactive({##gene_symbol
-    req(gene_results_de())
     data <- gene_results_de()[["1"]][["test"]]##c("padj",multiple "log2Fo'ldChange","baseMean","pvalue","stat","lfcSE")
+    print(head(data))
     return(annotate_results(input = input, data = data, ensembl2id = ensembl2id(), pathway_dic = pathway_dic(), circ=F))
   })
 
   gene_data <- reactiveValues()
-
-  observeEvent(input$start, {
-    gene_data$df <- gene_results()
-  })
 
   observeEvent(input$Atlas_run,{
     req(gene_results())
@@ -195,7 +266,7 @@ server <- function(input, output) {
   })
 
   gene_results_circ <- reactive({#tilf?je BSJ og LIN?
-    req(!is.null(gene_results_de()[[paste0("circRNA",1)]][["circ_info"]]))
+    req(!is.null(gene_data$df[[paste0("circRNA",1)]][["circ_info"]]))
     d <- gene_results_de()[[paste0("circRNA",1)]][["test"]]
     d$ensembl_gene_id <- gene_results_de()[[paste0("circRNA",1)]][["circ_info"]]$ensembl_gene_id
     d$padj <- runif(n = length(d$padj), max = 0.1)/1000 ###temporary
@@ -204,13 +275,14 @@ server <- function(input, output) {
   })
 
   gene_results_2 <- reactive({
-    req(gene_data$df)
+    req(gene_results())
+    print(head(gene_data$df))
     gene_results <- gene_filtering()
     return(gene_results)
   })
 
   gene_results_filtered <- reactive({
-    req(gene_data$df,eval(parse(text = input$p)))
+    req(gene_results(),eval(parse(text = input$p)))
     return(filter_results(input, gene_data$df))
   })
 
@@ -223,7 +295,7 @@ server <- function(input, output) {
 
   gene_results_sign <- reactive({
     req(gene_results())
-    data_sign <- gene_results()[gene_results()$padj < eval(parse(text = input$p)) & abs(gene_results()$log2FoldChange) > log2(input$fc),]
+    data_sign <- gene_results()[gene_results()[[paste0("padj",isolate(input$case1))]] < eval(parse(text = input$p)) & abs(gene_results()$log2FoldChange) > log2(input$fc),]
     data_sign <- data_sign[!is.na(data_sign[[1]]),] #Why do columns with NA occur?
     return(data_sign)
   })
@@ -348,12 +420,12 @@ server <- function(input, output) {
 
   output$volcano_title <- renderUI({
     req(gene_results_filtered())
-    HTML(paste(" ",h3(paste0("Volcano plot of ", input$phen1)), sep = '<br/>'))
+    HTML(paste(" ",h3(paste0("Volcano Plot of ", input$phen1)), sep = '<br/>'))
   })
 
   output$volcano_text <- renderUI({
     req(gene_results_filtered())
-    s0 <- "The volcano plot shows a summary of the differential expression regression analysis. Only 10 percent on non-significant genes are plotted. You can adjust the probability and fold cutoff in the buttom of the Upload Data section, also after the analysis."
+    s0 <- "The Volcano Plot shows a summary of the differential expression regression analysis. Only 10 percent on non-significant genes are plotted. You can adjust the probability and fold cutoff in the buttom of the Upload Data section, you can also do this after the analysis."
     s1 <- "&#9;The plot can be colored by typing a search term for a given column in one of the text boxes to the left, see (2). You can use .* to indicate wildcards (one or more characters of any type). In the Post Analysis you can run a K-means clustering algorithm, and annotate the plot with the clusters. Only the significant genes are included in the clustering."
     s3 <- "&#9;By hovering your curser over the plot, you will see different options of graph interaction in the top right corner - this is the case for all plots. You can export the figure in svg by clicking on the camera symbol. If you click on items in the legend they are removed from view, you can also doubleclick to exclude everything but the given type, doubleclick again to reverse."
     s2 <- "&#9;You can interact with the plot to zoom in on an area when the zoom option is selected, and you can choose the 'box select'/'lasso select' to select datapoints of interest. This will show details on the specific genes, and a boxplot will be plotted below showing normalized gene expressions."
@@ -368,12 +440,12 @@ server <- function(input, output) {
 
   output$volcano_title_circ <- renderUI({
     req(gene_results_filtered_circ())
-    HTML(paste(" ",h3(paste0("Volcano plot of circRNA for ", input$phen1)), sep = '<br/>'))
+    HTML(paste(" ",h3(paste0("Volcano Plot of circRNA for ", input$phen1)), sep = '<br/>'))
   })
 
   output$volcano_text_circ <- renderUI({
     req(gene_results_filtered_circ(),!is.null(input_data$inp[[paste0("circRNA",1)]]))
-    s0 <- "The volcano plot shows a summary of the differential expression regression analysis. Only 10 percent on non-significant genes are plotted. You can adjust the probability and fold cutoff in the input section."
+    s0 <- "The Volcano Plot shows a graphical representation of the differential expression regression analysis. Only 10 percent of non-significant genes are plotted. You can adjust the probability and fold cutoff in the input section, you can also choose to do it after the first analysis."
     s1 <- "   The plot can be colored by typing a search term for a given column in one of the text boxes to the left, see (2). You can use .* to indicate wildcards (one or more characters of any type). In the Post Analysis you can run a K-means clustering algorithm, and annotate the plot with the clusters. Only the significant genes are included in the clustering."
     s3 <- "   You can also export the figure in svg by clicking on the camera symbol in the top right corner. If you click on items in the legend they are removed from view."
     s2 <- "   You can interact with the plot to zoom in on an area when the zoom option is selected, and you can choose the 'box select'/'lasso select' to select datapoints of interest. This will show details on the specific genes, and a boxplot will be plotted showing normalized gene expressions."
@@ -394,7 +466,7 @@ server <- function(input, output) {
   })
 
   circToLin <- reactive({
-    req(gene_results_de())
+    req(gene_results())
     a <- gene_results_de()[[paste0("circRNA",1)]][["test"]]
     d <- gene_results_de()[[paste0("circRNA",1)]][["circ_info"]]
     d <- cbind(a,d)
@@ -426,17 +498,15 @@ server <- function(input, output) {
   })
 
   output$pca <- renderPlotly({
-    req(gene_results_de())
+    req(gene_results())
     pheno <- input_data$inp[[paste0("pheno",1)]]
-    print(ncol(pheno))
-    print(input$group_col)
     if(is.null(input$pca_pheno)){
       showNotification("You need to specify a valid column number",type = "message")
-      ann <- factor(pheno[[input$group_col]])
+      ann <- factor(pheno[[input$group_col1]])
     }
     else if(input$pca_pheno > ncol(pheno)){
       showNotification("You need to specify a valid column number",type = "message")
-      ann <- factor(pheno[[input$group_col]])
+      ann <- factor(pheno[[input$group_col1]])
     }
     else {
       ann <- factor(pheno[[input$pca_pheno]])
@@ -680,9 +750,8 @@ server <- function(input, output) {
     row.names(count_sub) <- d$gene_symbol
     d2 <- data.frame(t(count_sub))
     pheno <- input_data$inp[[paste0("pheno",1)]]
-    d2$phenotype <- pheno[[1]]##subset count data for gene ids?
+    d2$phenotype <- factor(pheno[[input$group_col1]])##subset count data for gene ids?
     d2 <- melt(data = d2, id = c("phenotype"))
-
     output$volcano_selected <- renderUI({
       dataTableOutput("volcano_s")
     })
@@ -933,9 +1002,9 @@ ui <- fluidPage(
     sidebarPanel(
       h2("Data Upload"),
       numericInput("nfiles", "Number of paired datasets", value = 1, min = 1, step = 1),
-      p("Paired datasets are RNA expression count data and metadata for a given experiment. The first pair will be treated as your primary data"),
+      p("Paired datasets are defined as RNA expression count data and metadata for a given experiment. The first pair will be treated as your primary data."),
       numericInput("afiles", "Number of annotation datasets", value = 0, min = 0, step = 1),
-      p("Annotation datasets annotate each sample. It requires the column of sample IDs and one or more annotation column(s)."),
+      p("Annotation datasets annotate each sample. The data must include a column of sample IDs and one or more annotation columns."),
       uiOutput("circRNAfiles"),
       p("Leave at 0 if no datasets have circRNA data."),
       uiOutput("fileInputs"),
@@ -953,11 +1022,11 @@ ui <- fluidPage(
       h2("Secondary Parameters"),
       checkboxInput(inputId = "use_cancer", label = "Use summary statistics from cancers", value = F),
       checkboxInput(inputId = "use_neuro", label = "Use summary statistics from neurological diseases", value = F),
-      p("These are curated datasets where fold change values are only included (otherwise set as NA) for significantly differentially expressed genes for each experiment. The data will be shown in tables and visualized as heatmaps"),
+      p("These are curated datasets where fold change values are only included (otherwise set as NA) for significantly differentially expressed genes for each experiment. The data will be shown in tables and visualized as heatmaps."),
       checkboxInput(inputId = "chain", label = "(1) Chain graphs with filtered table", value = F),
       p("Chaining will select the genes which are currently showing in the relevant tables and show them on the heatmaps."),
       p("Type ID of the dataset you wish to plot."),
-      textInput(inputId = "volcano_col", label = "(2) A column to annotate color in the volcano plot",value = "gene_biotype"),
+      textInput(inputId = "volcano_col", label = "(2) A column to annotate color in the Volcano Plot",value = "gene_biotype"),
       p("Type in a search term matching a parameter you wish to annotate with."),
       textInput(inputId = "col_high", label = "Color of continuous high values", value = "red"),
       textInput(inputId = "col_low", label = "Color of continuous low values", value = "blue"),
@@ -965,14 +1034,15 @@ ui <- fluidPage(
       checkboxInput(inputId = "log_scale", label = "Scale color values for the Volcano Plot", value = FALSE),
       numericInput(inputId = "pca_pheno", label = "PCA annotation column", value = 1),
       checkboxInput(inputId = "cor_abs", label = "Absolute correlation values", value = FALSE),
-      p("This affects the gene-gene interaction heatmap. If selected the sign of the values are not considdered."),
+      p("This affects the gene-gene interaction heatmap. If selected the sign of the values are not considered."),
       actionButton(inputId = "start", label = "Start Analysis!"),
+      actionButton(inputId = "update", label = "Update Results!"),
 
       tags$hr(),
       h2("Post Analysis"),
       numericInput(inputId = "k_cluster", label = "K-means clustering", value = 6),
       actionButton(inputId = "k_cluster_run", label = "Run K-means cluster!"),
-      p("Running the K-means clustering will add a column to the DE results table, grouping the genes into k groups, using the expression values for the significant hits. You can annotate the Volcano Plot with these groups see (1)."),
+      p("Running the K-means clustering will add a column to the DE results table, grouping the genes into k groups, using the expression values for the significant hits. You can annotate the Volcano Plot with these groups see (2)."),
       textInput("gene_interaction", label = "(3) Comma separated gene IDs (Ensembl or HGNC) for Stringdb interaction search",value = ""),
       p("This search term will use the Stringdb protein interaction database to only include genes in the DE analysis table that are known to interact with the given genes."),
       textInput("atlas_query", label = "(4) Enter Atlas phenotype query", value = ""),
@@ -980,7 +1050,7 @@ ui <- fluidPage(
       actionButton(inputId = "Atlas_search", label = "Search Atlas database!"),
       textInput("Atlas_ids", label = "Enter Atlas ids", value = ""),
       p("Search for datasets related to specific EBI comma-separated IDs."),
-      p("Both of the above options will download the data and analyze it and then include it in your DE analysis results table."),
+      p("Both of the above options will download the data and analyze it, then include it in your DE analysis results table."),
       actionButton(inputId = "Atlas_run", label = "Add Atlas dataset(s)!"),
       textInput(inputId = "experiment_id", label = "(5) Use alternative dataset for Volcano Plot", value = ""),
       p("If you have multiple analysis results added to the table, you can search for the experiment ID, and the data will be plotted instead."),
