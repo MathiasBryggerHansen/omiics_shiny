@@ -1,11 +1,10 @@
-options(shiny.maxRequestSize = 100*1024^2)
+options(shiny.maxRequestSize = 100*1024^2) #adjust the allowed size of data upload
 
-
-if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
 requiredpackages <- c("colorspace","digest","heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca","devtools","SummarizedExperiment","enrichR","DT","DESeq2","scales")
 
-install_load <- function(packages){
-   for (p in packages) {
+install_load <- function(packages){#This functions handles dependencies, installing and loading packages as needed
+  if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
+  for (p in packages) {
      if (p %in% row.names(installed.packages())) {
        library(p, character.only=TRUE)
      } else {
@@ -16,7 +15,7 @@ install_load <- function(packages){
 }
 
 install_load(requiredpackages)
-if("omiicsRNAseq" %in% loadedNamespaces()){
+if("omiicsRNAseq" %in% loadedNamespaces()){#if the package is already loaded, detach it before new install
   detach("package:omiicsRNAseq", unload=TRUE)
 }
 
@@ -28,42 +27,37 @@ library(omiicsRNAseq)
 server <- function(input, output) {
   ##########################################
   ##Load annotation data
+  #all needed local data is kept in the "data" directory
   pathway_dic <- reactive(readRDS(file = paste0("data/gene_dic_",input$species,".RDS")))
   cancer_gene_FC <- reactive(readRDS(file = paste0("data/",input$species,"_cancer.RDS"))) #FC values from E. Atlas cancer data only vs control
   neuro_gene_FC <- reactive(readRDS(file = paste0("data/",input$species,"_neuro.RDS")))
   probe_library <- reactive(readRDS(paste0("data/",input$species,"_probe_library.RDS")))
   stringdb_id <- list("human" = 9606, "zebrafish" = 7955, "rat" = 10116, "chicken" = 9031, "mouse" = 10090)
   ebi_id <- list("human" = "homo_sapiens","zebrafish" = "danio_rerio","rat" = "rattus_norvegicus", "chicken" = "gallus_gallus", "mouse" = "mus_musculus")
-  string_db <- reactive(STRINGdb$new(version = "11",score_threshold=200, species = stringdb_id[[input$species]]))# version="11" - does not work with shiny server
+  string_db <- reactive(STRINGdb$new(version = "11",score_threshold=200, species = stringdb_id[[input$species]]))
   #translate from ensembl to other gene ids
   ensembl2id <- reactive(return(readRDS(paste0("data/id_table_",input$species,".RDS"))))
 
   ###########################################
   ##Global variables + helper functions
 
-
   p_max <- 10**-2 #used to avoid overload
   dbs <- c("GO_Molecular_Function_2018","GO_Cellular_Component_2018","KEGG_2019_Human","Reactome_2016")
 
   #Runs count2deseq_analysis() or limma_analysis() for the data inputs.
 
-  updateResults <- function(pheno, control, case, res, isDeseq = T){
+  updateResults <- function(pheno, control, case, res, isDeseq = T){ #Used when the DE data needs to be updated
     res$phenotypes <- relevel(res$phenotypes, control)
     phenotypes <- factor(pheno[[input[[paste0("group_col",1)]]]])
-    print(phenotypes)
-    print(control)
     cases <- as.vector(unlist(phenotypes[!phenotypes%in%control]))
-    print(cases)
-    print(str(cases))
     if(isDeseq){
       for(i in unique(cases)){
-        print(i)
-        test <- DESeq2::results(res,contrast = c("phenotypes",i,control))
+        test <- DESeq2::results(res,contrast = c("phenotypes",i,control))#Keeping control constant, and comparing with all cases
+        test <- data.frame(test)
         if(!exists("de_res")){
           if(length(unique(cases)) == 1){
-            de_res <- test
             colnames(de_res) <- c("baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
-            de_res <- de_res[,c("baseMean","log2FoldChange","padj")]
+            de_res <- test[,c("baseMean","log2FoldChange","padj")]
             de_res$ensembl_gene_id <- row.names(de_res)
           }
           if (i == case){
@@ -79,9 +73,13 @@ server <- function(input, output) {
         }
         else {
           if (i == case){
-            de_res <- test[,c("baseMean","log2FoldChange","padj")]
-            colnames(de_res) <- c("baseMean",paste0("log2FoldChange"),paste0("padj"))
-            de_res$ensembl_gene_id <- row.names(de_res)
+            # de_res <- test[,c("baseMean","log2FoldChange","padj")]
+            # colnames(de_res) <- c("baseMean",paste0("log2FoldChange"),paste0("padj"))
+            # de_res$ensembl_gene_id <- row.names(de_res)
+            colnames(test) <- c("baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
+            test <- test[,c("log2FoldChange","padj")]
+            test$ensembl_gene_id <- row.names(test)
+            de_res <- merge(de_res, test, by = "ensembl_gene_id")
           }
           else {
             colnames(test) <- c("baseMean",paste0("log2FoldChange_",i),"lfcSE","stat","pvalue",paste0("padj_",i))
@@ -91,11 +89,12 @@ server <- function(input, output) {
           }
         }
       }
+      #row.names(de_res) <- de_res$ensembl_gene_id
       return(de_res)
     }
   }
 
-  gene_results_de <- reactive({
+  gene_results_de <- reactive({#used to run and store the preliminary DE Analysis, the resulting list also includes normalized counts
     req(input_data$inp)
     input$start
     isolate({
@@ -117,8 +116,6 @@ server <- function(input, output) {
           showNotification(paste0("Your case group must match one group ID (",paste(phenotypes, collapse = ", "),")"),type = "message")
         }
         req(control%in%phenotypes, case%in%phenotypes)
-
-        #pheno[[2]] <- NULL
         ids <- row.names(counts)
 
         if(!grepl(ids[1],pattern = "ENS")){
@@ -129,8 +126,7 @@ server <- function(input, output) {
           res[[paste0("circRNA",toString(i))]] <- de_circ(data = circ,pheno = pheno,i = i)
         }
 
-        if(input[[paste0("raw_counts",i)]]){
-          print("her")
+        if(input[[paste0("raw_counts",i)]]){#if the data is raw run DESeq2
           res[[toString(i)]] <- count2deseq_analysis(input, countdata = counts, pheno = pheno, i = i)
         }
         else {
@@ -163,7 +159,7 @@ server <- function(input, output) {
 
   ############################################################################################################
 
-  output$significant_genes <- downloadHandler({
+  output$significant_genes <- downloadHandler({#handles the generation of a table with the significant results
     file <- "significant_genes.txt"
   }, content = function(file) {
     temp <- gene_results_sign()
@@ -171,7 +167,7 @@ server <- function(input, output) {
     write.table(temp, file, row.names = FALSE,sep = "\t",quote = F)
   })
 
-  output$enrichment_analysis <- downloadHandler({
+  output$enrichment_analysis <- downloadHandler({#Enrichment from enrichR
     file <- "enrichment_analysis.txt"
   }, content = function(file) {
     write.table(enrich_out(), file, row.names = FALSE,sep = "\t",quote = F)
@@ -224,12 +220,20 @@ server <- function(input, output) {
     showNotification("Analysis will be running for some seconds...",type = "message",duration = 5)
     input_data$inp <- input_d(input, probe_library())
     gene_data$df <- gene_results()
-    print("input done")
   })
 
   observeEvent(input$update, {
-    req(gene_results())
-    gene_results_de()[["1"]][["test"]] <- updateResults(pheno = input_data$inp[[paste0("pheno",1)]], case = input$case1, control = input$control1, res = gene_results_de()[["1"]][["dds"]], isDeseq = T)
+    req(gene_results_de())
+    print(head(gene_results_de()[["1"]][["test"]]))
+    temp <- updateResults(pheno = input_data$inp[[paste0("pheno",1)]], case = input$case1, control = input$control1, res = gene_results_de()[["1"]][["dds"]], isDeseq = T)
+    print(head(temp))
+    try({
+      gene_results_de[["1"]][["test"]] <- reactive(temp)
+      print("her")})
+    try({
+      gene_results_de()[["1"]][["test"]] <- reactive(temp)
+    })
+
   })
 
   gene_results <- reactive({##gene_symbol
