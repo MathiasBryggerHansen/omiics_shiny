@@ -1,6 +1,6 @@
 options(shiny.maxRequestSize = 100*1024^2) #adjust the allowed size of data upload
 
-requiredpackages <- c("colorspace","digest","heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca","devtools","SummarizedExperiment","enrichR","DT","DESeq2","scales","edgeR")
+requiredpackages <- c("DelayedArray","dplyr","colorspace","digest","heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca","devtools","SummarizedExperiment","enrichR","DT","DESeq2","scales","edgeR")
 
 install_load <- function(packages){#This functions handles dependencies, installing and loading packages as needed
   if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
@@ -27,16 +27,22 @@ library(omiicsRNAseq)
 server <- function(input, output) {
   ##########################################
   ##Load annotation data
-  #all needed local data is kept in the "data" directory
-  pathway_dic <- reactive(readRDS(file = paste0("data/gene_dic_",input$species,".RDS")))
-  cancer_gene_FC <- reactive(readRDS(file = paste0("data/",input$species,"_cancer.RDS"))) #FC values from E. Atlas cancer data only vs control
-  neuro_gene_FC <- reactive(readRDS(file = paste0("data/",input$species,"_neuro.RDS")))
-  probe_library <- reactive(readRDS(paste0("data/",input$species,"_probe_library.RDS")))
+  #all needed local data is kept in the ./data directory
+  spec <- reactive(ifelse(input$species == "rat","mouse", input$species))
+  pathway_dic <- reactive(readRDS(file = paste0("data/gene_dic_",spec(),".RDS")))
+  cancer_gene_FC <- reactive(readRDS(file = paste0("data/",spec(),"_cancer.RDS"))) #FC values from E. Atlas cancer data only vs control
+  neuro_gene_FC <- reactive(readRDS(file = paste0("data/",spec(),"_neuro.RDS")))
+  probe_library <- reactive(readRDS(paste0("data/",spec(),"_probe_library.RDS")))
   stringdb_id <- list("human" = 9606, "zebrafish" = 7955, "rat" = 10116, "chicken" = 9031, "mouse" = 10090)
   ebi_id <- list("human" = "homo_sapiens","zebrafish" = "danio_rerio","rat" = "rattus_norvegicus", "chicken" = "gallus_gallus", "mouse" = "mus_musculus")
-  string_db <- reactive(STRINGdb$new(version = "11",score_threshold=200, species = stringdb_id[[input$species]]))
+  string_db <- reactive(STRINGdb$new(version = "11",score_threshold=200, species = stringdb_id[[spec()]]))
   #translate from ensembl to other gene ids
-  ensembl2id <- reactive(return(readRDS(paste0("data/id_table_",input$species,".RDS"))))
+  ensembl2id <- reactive(return(readRDS(paste0("data/id_table_",spec(),".RDS"))))
+  id_conv <- reactive(readRDS("data/id_human_mouse_rat.RDS"))
+  # else{
+  #   id_conv <- NULL
+  # }
+  
 
   ###########################################
   ##Global variables + helper functions
@@ -56,10 +62,7 @@ server <- function(input, output) {
         test <- DESeq2::results(dds,contrast = c("phenotypes",i,control))#Keeping control constant, and comparing with all cases
         test <- data.frame(test)
         colnames(test) <- c("baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
-        
         test <- test[,c("baseMean","log2FoldChange","padj")]
-        
-        print(head(test))
         if(!exists("de_res")){
           if(length(unique(cases)) == 1){
             #colnames(de_res) <- c("baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
@@ -75,18 +78,13 @@ server <- function(input, output) {
         }
         else {
           if (i == case){
-            # de_res <- test[,c("baseMean","log2FoldChange","padj")]
-            # colnames(de_res) <- c("baseMean",paste0("log2FoldChange"),paste0("padj"))
-            # de_res$ensembl_gene_id <- row.names(de_res)
-            #colnames(test) <- c("baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
             test <- test[,c("log2FoldChange","padj")]
-            de_res <- cbind(de_res, test)#merge(de_res, test, by = "ensembl_gene_id")
+            de_res <- cbind(de_res, test)
           }
           else {#test[,c("baseMean","log2FoldChange","padj")]
             colnames(test) <- c("baseMean",paste0("log2FoldChange_",i),paste0("padj_",i))
             test <- test[,c(paste0("log2FoldChange_",i),paste0("padj_",i))]
-            #test$ensembl_gene_id <- row.names(test)
-            de_res <- cbind(de_res, test)#merge(de_res, test, by = "ensembl_gene_id")
+            de_res <- cbind(de_res, test)
           }
         }
       }
@@ -97,8 +95,6 @@ server <- function(input, output) {
       res[["norm_counts"]] <- assay(varianceStabilizingTransformation(dds))
       res[["dds"]] <- dds
       res[["phenotypes"]] <- phenotypes
-      #print(head(de_res))
-      #row.names(de_res) <- de_res$ensembl_gene_id
       return(res)
     }
   }
@@ -113,8 +109,9 @@ server <- function(input, output) {
       for (i in 1:input$nfiles){
         counts <- files[[paste0("count",i)]]
         pheno <- files[[paste0("pheno",i)]]
-        circ <- files[[paste0("circRNA",i)]]
-
+        circ <- files[[paste0("circRNA",i)]] #circRNA data
+        print("nrow circ: ")
+        print(nrow(circ))
         control <- isolate(input[[paste0("control",i)]]) #this needs to be adjusted if there are multiple files?
         case <- isolate(input[[paste0("case",i)]])
         phenotypes <- factor(pheno[[input[[paste0("group_col",i)]]]])
@@ -132,11 +129,14 @@ server <- function(input, output) {
         }
         row.names(counts) <- make.names(ids,unique = T)
         if(!is.null(circ)){
-          res[[paste0("circRNA",toString(i))]] <- de_circ(data = circ,pheno = pheno,i = i)
+          res[[paste0("circRNA",toString(i))]] <- de_circ(input = input, ensembl2id = ensembl2id(), data = circ, data_lin = counts, pheno = pheno,i = i)
         }
 
         if(input[[paste0("raw_counts",i)]]&is.null(gene_data$df)){#if the data is raw run DESeq2
+          print("linRNA")
           res[[toString(i)]] <- count2deseq_analysis(input, countdata = counts, pheno = pheno, i = i)
+          print("done")
+          print(head(res[[toString(i)]]))
         }
         else if(input[[paste0("raw_counts",i)]]&!is.null(gene_data$de)){
           res[[toString(i)]] <- updateResults(pheno = pheno, control = control, case = case, dds = gene_data$de)
@@ -162,7 +162,6 @@ server <- function(input, output) {
         }
       }
       showNotification("DE analysis done",type = "message",duration = 10)
-      print(head(res[[toString(i)]]))
       return(res)
       })
     })
@@ -204,10 +203,8 @@ server <- function(input, output) {
                         p("This is used for headers and graphs as the defining name."),
                         numericInput(paste0("group_col",i), "Column number for group", value = 2, min = 0, step = 1),
                         numericInput(paste0("sample_col",i), "Column number for sample", value = 1, min = 0, step = 1),
-                        numericInput(paste0("batch_col",i), "Column number for batch, leave at zero if there is none", value = 3, min = 0, step = 1),
+                        numericInput(paste0("batch_col",i), "Column number for batch, ignore if there is no batch correction", value = 3, min = 0, step = 1),
                         p("Select the correct column numbers in the metadata."))
-
-
       if(toString(i)%in%input$circRNA){
         html_ui <- paste0(html_ui, fileInput(inputId = paste0("circRNA",i), label=paste0("circRNA data ",i)))
       }
@@ -232,31 +229,22 @@ server <- function(input, output) {
 
   observeEvent(input$start, {
     showNotification("Analysis will be running for some seconds...",type = "message",duration = 5)
-    input_data$inp <- input_d(input, probe_library())
+    input_data$inp <- input_d(input = input, probe_library = probe_library(),id_conv = id_conv())
     gene_data$df <- gene_results()
+    #gene_data$df_circ <- gene_results_circ()
     gene_data$de <- gene_results_de()[["1"]][["dds"]]
   })
 
-  # observeEvent(input$update, {
-  #   req(gene_results_de())
-  #   print(head(gene_results_de()[["1"]][["test"]]))
-  #   temp <- updateResults(pheno = input_data$inp[[paste0("pheno",1)]], case = input$case1, control = input$control1, res = gene_results_de()[["1"]][["dds"]], isDeseq = T)
-  #   print(head(temp))
-  #   try({
-  #     gene_results_de[["1"]][["test"]] <- reactive(temp)
-  #     print("her")})
-  #   try({
-  #     gene_results_de()[["1"]][["test"]] <- reactive(temp)
-  #   })
-  # 
-  # })
-
   gene_results <- reactive({##gene_symbol
-    print(str(gene_results_de()))
-    data <- gene_results_de()[["1"]][["test"]]##c("padj",multiple "log2Fo'ldChange","baseMean","pvalue","stat","lfcSE")
-    print(head(data))
-    return(annotate_results(input = input, data = data, ensembl2id = ensembl2id(), pathway_dic = pathway_dic(), circ=F))
+    data <- gene_results_de()[["1"]]##c("padj",multiple "log2Fo'ldChange","baseMean","pvalue","stat","lfcSE")
+    return(annotate_results(input = input, data = data,spec = spec(),id_conv = id_conv(), ensembl2id = ensembl2id(), pathway_dic = pathway_dic(), circ=F))
   })
+  
+  gene_results_circ <- reactive({##gene_symbol res[[paste0("circRNA",toString(i))]]
+    data <- gene_results_de()[["circRNA1"]]##c("padj",multiple "log2Fo'ldChange","baseMean","pvalue","stat","lfcSE")
+    return(annotate_results(input = input, data = data,spec = spec(),id_conv = id_conv(), ensembl2id = ensembl2id(), pathway_dic = pathway_dic(), circ=T))
+  })
+  
 
   gene_data <- reactiveValues()
 
@@ -285,15 +273,6 @@ server <- function(input, output) {
 
   })
 
-  gene_results_circ <- reactive({#tilf?je BSJ og LIN?
-    req(!is.null(gene_data$df[[paste0("circRNA",1)]][["circ_info"]]))
-    d <- gene_results_de()[[paste0("circRNA",1)]][["test"]]
-    d$ensembl_gene_id <- gene_results_de()[[paste0("circRNA",1)]][["circ_info"]]$ensembl_gene_id
-    d$padj <- runif(n = length(d$padj), max = 0.1)/1000 ###temporary
-    d$log2FoldChange <- runif(n = length(d$padj),min = -30, max = 30)
-    return(annotate_results(input = input,data = d,circ=T,pathway_dic = pathway_dic(),ensembl2id = ensembl2id()))
-  })
-
   gene_results_2 <- reactive({
     req(gene_results())
     gene_results <- gene_filtering()
@@ -302,9 +281,8 @@ server <- function(input, output) {
 
   gene_results_filtered <- reactive({
     req(gene_results(),eval(parse(text = input$p)))
-    return(filter_results(input, gene_data$df))
+    return(filter_results(input, gene_results()))# gene_data$df
   })
-
 
   gene_results_filtered_circ <- reactive({
     req(!is.null(gene_results_circ()),eval(parse(text = input$p)))
@@ -454,7 +432,6 @@ server <- function(input, output) {
 
   output$volcano <- renderPlotly({
     req(gene_results_filtered(), eval(parse(text = input$p))<p_max)
-    #saveRDS(gene_results_filtered(), file = "volcano_data.RDS")
     volcano_plot(input = input, data = gene_results_filtered(), pathway_dic = pathway_dic())})
 
   output$volcano_title_circ <- renderUI({
@@ -463,7 +440,7 @@ server <- function(input, output) {
   })
 
   output$volcano_text_circ <- renderUI({
-    req(gene_results_filtered_circ(),!is.null(input_data$inp[[paste0("circRNA",1)]]))
+    req(gene_results_filtered_circ())#,!is.null(input_data$inp[[paste0("circRNA",1)]])
     s0 <- "The Volcano Plot shows a graphical representation of the differential expression regression analysis. Only 10 percent of non-significant genes are plotted. You can adjust the probability and fold cutoff in the input section, you can also choose to do it after the first analysis."
     s1 <- "   The plot can be colored by typing a search term for a given column in one of the text boxes to the left, see (2). You can use .* to indicate wildcards (one or more characters of any type). In the Post Analysis you can run a K-means clustering algorithm, and annotate the plot with the clusters. Only the significant genes are included in the clustering."
     s3 <- "   You can also export the figure in svg by clicking on the camera symbol in the top right corner. If you click on items in the legend they are removed from view."
@@ -473,14 +450,14 @@ server <- function(input, output) {
   })
 
   output$volcano_c <- renderPlotly({
-    req(gene_results_filtered_circ(), eval(parse(text = input$p))<p_max,!is.null(input_data$inp[[paste0("circRNA",1)]]))
-    res <- gene_results_filtered_circ()
+    req(gene_results_filtered_circ(), eval(parse(text = input$p))<p_max)#,!is.null(input_data$inp[[paste0("circRNA",1)]])
+    res <- gene_results_filtered_circ()#volcano_plot(input = input, data = gene_results_filtered(), pathway_dic = pathway_dic())})
     volcano_plot(input = input, res, pathway_dic = pathway_dic())
   })
 
 
   output$volcano_circ <- renderUI({
-    req(gene_results_filtered_circ(), eval(parse(text = input$p))<p_max,!is.null(input_data$inp[[paste0("circRNA",1)]]))
+    req(gene_results_filtered_circ(), eval(parse(text = input$p))<p_max)#,!is.null(input_data$inp[[paste0("circRNA",1)]]))
     plotlyOutput("volcano_c",height = "1000px")
   })
 
@@ -511,7 +488,7 @@ server <- function(input, output) {
   output$pca_text <- renderUI({
     req(gene_results())
     s1 <- "The PCA plot shows the first three principle components discriminating each sample."
-    s2 <- "   By using your scroll, you can zoom in and out and clicking and dragging the cursor will rotate the view."
+    s2 <- "   By scrollling you can zoom in and out, and clicking and dragging the cursor will rotate the view."
     s3 <- "   You can export the figure when you have found a fitting angle by clicking the photo symbol in the upper corner."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
@@ -599,7 +576,7 @@ server <- function(input, output) {
       if(grepl(gene_ids[1],pattern = "^ENS")){
         gene_ids <- gene_data$df[gene_data$df$ensembl_gene_ids%in%gene_ids,"gene_symbol"]
       }
-      gene_network <- read.table(url(paste0("https://string-db.org/api/tsv/interaction_partners?identifiers=",paste(gene_ids,collapse = "%0d"),"&species=",stringdb_id[[input$species]],"&required_score=950&limit=1000")),header = T)$preferredName_B
+      gene_network <- read.table(url(paste0("https://string-db.org/api/tsv/interaction_partners?identifiers=",paste(gene_ids,collapse = "%0d"),"&species=",stringdb_id[[spec()]],"&required_score=950&limit=1000")),header = T)$preferredName_B
       gene_network <- c(gene_ids,gene_network)
       return(gene_data$df[gene_data$df$gene_symbol%in%gene_network,])
     }
@@ -617,13 +594,23 @@ server <- function(input, output) {
     s3 <- "   The added datasets can for example be used to annotate your primary dataset, or you can create a new volcano plot with the input."
     HTML(paste("<p>",paste(s1, s2, s3,sep = '<br/>'),"</p>"))
   })
-  output$sign_pheno_exp <- renderDataTable({#gene_filtered <- gene_results_filtered()[gene_results_filtered()$padj < eval(parse(text = input$p)) & !is.na(gene_results_filtered()$padj) & abs(gene_results_filtered()$log2FoldChange) > log2(input$fc),]
+  output$sign_pheno_exp <- renderDataTable({
     req(gene_results(),eval(parse(text = input$p))<p_max)
     if(length(sign_g()$ensembl_gene_id)>100){
-      sign_genes <- sign_g()$ensembl_gene_id[1:100] #top 100 to avoid overload
+      if(input$species == "rat"){
+        sign_genes <- sign_g()$ensembl_gene_id_rat[1:100]#ebi will need the rat ensembl ids
+      }
+      else{
+        sign_genes <- sign_g()$ensembl_gene_id[1:100] #top 100 to avoid overload
+      }
     }
     else{
-      sign_genes <- sign_g()$ensembl_gene_id
+      if(input$species == "rat"){
+        sign_genes <- sign_g()$ensembl_gene_id_rat
+      }
+      else{
+        sign_genes <- sign_g()$ensembl_gene_id
+      }
     }
     datatable(testGenes(sign_genes, ebi_id, input = input),escape = F)
   })
@@ -737,8 +724,6 @@ server <- function(input, output) {
   })
 
   ##
-
-
   observeEvent(event_data("plotly_selected"), {
     req(length(event_data("plotly_selected"))!=0)
     req(!is.null(event_data("plotly_selected")),nrow(event_data("plotly_selected"))>1)
@@ -990,16 +975,13 @@ server <- function(input, output) {
               height = 1000
             ))})
       output$stringdb_box <- renderUI({plotlyOutput("stringdb_b")})
-      js$loadStringData(selected_genes,stringdb_id[[input$species]])
+      js$loadStringData(selected_genes,stringdb_id[[spec()]])
     }
     else{
-      js$loadStringData(sign_g()$gene_symbol,stringdb_id[[input$species]])
+      js$loadStringData(sign_g()$gene_symbol,stringdb_id[[spec()]])
     }
   })
-  output$stringdb_text <- renderUI({
-    req(gene_results())
-    HTML(paste(" ",p("String db protein interaction network, as default this will include all the significant hits."), sep = '<br/>'))
-  })
+
   output$stringdb_text <- renderUI({
     req(gene_results())
     s1 <- "String db protein interaction network, as default this will include all the significant hits."
@@ -1030,12 +1012,12 @@ ui <- fluidPage(
 
       tags$hr(),
       #checkboxGroupInput(inputId = "dbs", "Pathways to use in enrichment analysis:",c("GO Molecular Function" = "GO_Molecular_Function_2018","GO Cellular Component"="GO_Cellular_Component_2018","KEGG"="KEGG_2019_Human","Reactome"="Reactome_2016"),selected = "KEGG_2019_Human"),
-      radioButtons("species", "Species",choices = c(human = "human",mouse = "mouse"),selected = "human",inline = T),
+      radioButtons("species", "Species",choices = c(human = "human",mouse = "mouse", rat = "rat"),selected = "human",inline = T),
       checkboxInput(inputId = "batch_correction", label = "Use batch correction", value = F),
       p("This requires batch annotation in the metadata."),
       checkboxInput(inputId = "gene_filter", label = "Use filter to pre-exclude genes with no variance in expression", value = T),
-      textInput(inputId = "p", label = "p cutoff:",value = '10^-14'),
-      numericInput(inputId = "fc", label = "FC cutoff:", value = 2),
+      textInput(inputId = "p", label = "fdr cutoff",value = '10^-14'),
+      numericInput(inputId = "fc", label = "FC cutoff", value = 2),
 
       tags$hr(),
       h2("Secondary Parameters"),
@@ -1044,7 +1026,6 @@ ui <- fluidPage(
       p("These are curated datasets where fold change values are only included (otherwise set as NA) for significantly differentially expressed genes for each experiment. The data will be shown in tables and visualized as heatmaps."),
       checkboxInput(inputId = "chain", label = "(1) Chain graphs with filtered table", value = F),
       p("Chaining will select the genes which are currently showing in the relevant tables and show them on the heatmaps."),
-      p("Type ID of the dataset you wish to plot."),
       textInput(inputId = "volcano_col", label = "(2) A column to annotate color in the Volcano Plot",value = "gene_biotype"),
       p("Type in a search term matching a parameter you wish to annotate with."),
       textInput(inputId = "col_high", label = "Color of continuous high values", value = "red"),
@@ -1067,16 +1048,16 @@ ui <- fluidPage(
       textInput("atlas_query", label = "(4) Enter Atlas phenotype query", value = ""),
       p("Search EBI Expression Atlas for data related to the search term."),
       actionButton(inputId = "Atlas_search", label = "Search Atlas database!"),
-      textInput("Atlas_ids", label = "Enter Atlas ids", value = ""),
+      textInput("Atlas_ids", label = "Enter Atlas IDs", value = ""),
       p("Search for datasets related to specific EBI comma-separated IDs."),
       p("Both of the above options will download the data and analyze it, then include it in your DE analysis results table."),
       actionButton(inputId = "Atlas_run", label = "Add Atlas dataset(s)!"),
       textInput(inputId = "experiment_id", label = "(5) Use alternative dataset for Volcano Plot", value = ""),
-      p("If you have multiple analysis results added to the table, you can search for the experiment ID, and the data will be plotted instead."),
+      p("If you have multiple tests in the table, you can search for the ID, and the data will be plotted instead. See the column names in the table. This works for both multiple variables and experiments."),
       tags$hr(),
       downloadButton(outputId = "significant_genes", label = "Download DE gene table"),
       downloadButton(outputId = "enrichment_analysis",label = "Download enrichment analysis"),
-      downloadButton(outputId = "download_filtered",label = "Download filtered gene table"),
+      #downloadButton(outputId = "download_filtered",label = "Download filtered gene table"),
     ),
     #####################################
     # Main panel for displaying outputs ----
@@ -1089,13 +1070,14 @@ ui <- fluidPage(
         htmlOutput(outputId = "volcano_title"),
         plotlyOutput(outputId = "volcano",height = "1000px"),
         htmlOutput(outputId = "volcano_text"),
-
+        
+        #htmlOutput(outputId = "volcano_title_circ"),
+        uiOutput(outputId = "volcano_circ"),
+        #htmlOutput(outputId = "volcano_text_circ"),
+        
         uiOutput("volcano_selected"),
         uiOutput("boxplot_search"),
         htmlOutput(outputId = "boxplot_search_text"),
-
-        # htmlOutput("delta_cor_title"),
-        # uiOutput("delta_cor"),
 
         htmlOutput(outputId = "gene_results_title"),
         dataTableOutput("gene_results_table"),
