@@ -1,6 +1,6 @@
 options(shiny.maxRequestSize = 100*1024^2) #adjust the allowed size of data upload
 
-requiredpackages <- c("colorspace","digest","heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca","devtools","SummarizedExperiment","enrichR","DT","DESeq2","scales")
+requiredpackages <- c("colorspace","digest","heatmaply","STRINGdb","scales","affy","shinyjs","reshape2","gtools","orca","devtools","SummarizedExperiment","enrichR","DT","DESeq2","scales","edgeR")
 
 install_load <- function(packages){#This functions handles dependencies, installing and loading packages as needed
   if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
@@ -46,29 +46,31 @@ server <- function(input, output) {
 
   #Runs count2deseq_analysis() or limma_analysis() for the data inputs.
 
-  updateResults <- function(pheno, control, case, res, isDeseq = T){ #Used when the DE data needs to be updated
-    res$phenotypes <- relevel(res$phenotypes, control)
+  updateResults <- function(pheno, control, case, dds, isDeseq = T){ #Used when the DE data needs to be updated, avoid re-running dds
+    res <- list()
+    dds$phenotypes <- relevel(dds$phenotypes, control)
     phenotypes <- factor(pheno[[input[[paste0("group_col",1)]]]])
     cases <- as.vector(unlist(phenotypes[!phenotypes%in%control]))
     if(isDeseq){
       for(i in unique(cases)){
-        test <- DESeq2::results(res,contrast = c("phenotypes",i,control))#Keeping control constant, and comparing with all cases
+        test <- DESeq2::results(dds,contrast = c("phenotypes",i,control))#Keeping control constant, and comparing with all cases
         test <- data.frame(test)
+        colnames(test) <- c("baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
+        
+        test <- test[,c("baseMean","log2FoldChange","padj")]
+        
+        print(head(test))
         if(!exists("de_res")){
           if(length(unique(cases)) == 1){
-            colnames(de_res) <- c("baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
-            de_res <- test[,c("baseMean","log2FoldChange","padj")]
-            de_res$ensembl_gene_id <- row.names(de_res)
+            #colnames(de_res) <- c("baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
+            de_res <- test
           }
           if (i == case){
-            de_res <- test[,c("baseMean","log2FoldChange","padj")]
-            colnames(de_res) <- c("baseMean",paste0("log2FoldChange"),paste0("padj"))
-            de_res$ensembl_gene_id <- row.names(de_res)
+            de_res <- test
           }
           else{
-            de_res <- test[,c("baseMean","log2FoldChange","padj")]
+            de_res <- test
             colnames(de_res) <- c("baseMean",paste0("log2FoldChange_",i),paste0("padj_",i))
-            de_res$ensembl_gene_id <- row.names(de_res)
           }
         }
         else {
@@ -76,21 +78,28 @@ server <- function(input, output) {
             # de_res <- test[,c("baseMean","log2FoldChange","padj")]
             # colnames(de_res) <- c("baseMean",paste0("log2FoldChange"),paste0("padj"))
             # de_res$ensembl_gene_id <- row.names(de_res)
-            colnames(test) <- c("baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
+            #colnames(test) <- c("baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
             test <- test[,c("log2FoldChange","padj")]
-            test$ensembl_gene_id <- row.names(test)
-            de_res <- merge(de_res, test, by = "ensembl_gene_id")
+            de_res <- cbind(de_res, test)#merge(de_res, test, by = "ensembl_gene_id")
           }
-          else {
-            colnames(test) <- c("baseMean",paste0("log2FoldChange_",i),"lfcSE","stat","pvalue",paste0("padj_",i))
+          else {#test[,c("baseMean","log2FoldChange","padj")]
+            colnames(test) <- c("baseMean",paste0("log2FoldChange_",i),paste0("padj_",i))
             test <- test[,c(paste0("log2FoldChange_",i),paste0("padj_",i))]
-            test$ensembl_gene_id <- row.names(test)
-            de_res <- merge(de_res, test, by = "ensembl_gene_id")
+            #test$ensembl_gene_id <- row.names(test)
+            de_res <- cbind(de_res, test)#merge(de_res, test, by = "ensembl_gene_id")
           }
         }
       }
+      de_res$ensembl_gene_id <- row.names(test)
+      row.names(de_res) <- de_res$ensembl_gene_id #why is this needed?
+      de_res$ensembl_gene_id <- NULL
+      res[["test"]] <- de_res
+      res[["norm_counts"]] <- assay(varianceStabilizingTransformation(dds))
+      res[["dds"]] <- dds
+      res[["phenotypes"]] <- phenotypes
+      #print(head(de_res))
       #row.names(de_res) <- de_res$ensembl_gene_id
-      return(de_res)
+      return(res)
     }
   }
 
@@ -98,7 +107,7 @@ server <- function(input, output) {
     req(input_data$inp)
     input$start
     isolate({
-      showNotification("DE analysis is starting...",type = "message",duration = 5)
+      showNotification("Running analysis...",type = "message",duration = 5)
       res <- list()
       files <- input_data$inp
       for (i in 1:input$nfiles){
@@ -126,11 +135,15 @@ server <- function(input, output) {
           res[[paste0("circRNA",toString(i))]] <- de_circ(data = circ,pheno = pheno,i = i)
         }
 
-        if(input[[paste0("raw_counts",i)]]){#if the data is raw run DESeq2
+        if(input[[paste0("raw_counts",i)]]&is.null(gene_data$df)){#if the data is raw run DESeq2
           res[[toString(i)]] <- count2deseq_analysis(input, countdata = counts, pheno = pheno, i = i)
         }
+        else if(input[[paste0("raw_counts",i)]]&!is.null(gene_data$de)){
+          res[[toString(i)]] <- updateResults(pheno = pheno, control = control, case = case, dds = gene_data$de)
+        }
+        
         else {
-          d0 <- DGEList(assays(temp)$counts)
+          d0 <- DGEList(assays(counts)$counts) #should counts refer to something else?
           if(input$gene_filter){
             d0 <- d0[filterByExpr(d0, group=pheno),, keep.lib.sizes=FALSE]
           }
@@ -145,10 +158,11 @@ server <- function(input, output) {
             mm <- model.matrix(~0+f)
           }
           temp <- voom(d0, mm)
-          res[[toString(i)]] <- limma_analysis(countdata = temp,phenotypes = pheno[[input$group_col1]],design = mm)
+          res[[toString(i)]] <- limma_analysis(countdata = temp,phenotypes = pheno[[input$group_col1]], control = input$control1)
         }
       }
-      showNotification("DE analysis done, now doing secondary analysis and gaphics.",type = "message",duration = 10)
+      showNotification("DE analysis done",type = "message",duration = 10)
+      print(head(res[[toString(i)]]))
       return(res)
       })
     })
@@ -220,23 +234,25 @@ server <- function(input, output) {
     showNotification("Analysis will be running for some seconds...",type = "message",duration = 5)
     input_data$inp <- input_d(input, probe_library())
     gene_data$df <- gene_results()
+    gene_data$de <- gene_results_de()[["1"]][["dds"]]
   })
 
-  observeEvent(input$update, {
-    req(gene_results_de())
-    print(head(gene_results_de()[["1"]][["test"]]))
-    temp <- updateResults(pheno = input_data$inp[[paste0("pheno",1)]], case = input$case1, control = input$control1, res = gene_results_de()[["1"]][["dds"]], isDeseq = T)
-    print(head(temp))
-    try({
-      gene_results_de[["1"]][["test"]] <- reactive(temp)
-      print("her")})
-    try({
-      gene_results_de()[["1"]][["test"]] <- reactive(temp)
-    })
-
-  })
+  # observeEvent(input$update, {
+  #   req(gene_results_de())
+  #   print(head(gene_results_de()[["1"]][["test"]]))
+  #   temp <- updateResults(pheno = input_data$inp[[paste0("pheno",1)]], case = input$case1, control = input$control1, res = gene_results_de()[["1"]][["dds"]], isDeseq = T)
+  #   print(head(temp))
+  #   try({
+  #     gene_results_de[["1"]][["test"]] <- reactive(temp)
+  #     print("her")})
+  #   try({
+  #     gene_results_de()[["1"]][["test"]] <- reactive(temp)
+  #   })
+  # 
+  # })
 
   gene_results <- reactive({##gene_symbol
+    print(str(gene_results_de()))
     data <- gene_results_de()[["1"]][["test"]]##c("padj",multiple "log2Fo'ldChange","baseMean","pvalue","stat","lfcSE")
     print(head(data))
     return(annotate_results(input = input, data = data, ensembl2id = ensembl2id(), pathway_dic = pathway_dic(), circ=F))
@@ -280,7 +296,6 @@ server <- function(input, output) {
 
   gene_results_2 <- reactive({
     req(gene_results())
-    print(head(gene_data$df))
     gene_results <- gene_filtering()
     return(gene_results)
   })
@@ -1040,7 +1055,7 @@ ui <- fluidPage(
       checkboxInput(inputId = "cor_abs", label = "Absolute correlation values", value = FALSE),
       p("This affects the gene-gene interaction heatmap. If selected the sign of the values are not considered."),
       actionButton(inputId = "start", label = "Start Analysis!"),
-      actionButton(inputId = "update", label = "Update Results!"),
+      #actionButton(inputId = "update", label = "Update Results!"),
 
       tags$hr(),
       h2("Post Analysis"),
