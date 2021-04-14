@@ -46,7 +46,7 @@ server <- function(input, output) {
 
   ###########################################
   ##Global variables + helper functions
-
+  max_group <- 4 #the amount of groups shown with volcanoplot and linToCirc 
   p_max <- 10**-2 #used to avoid overload
   dbs <- c("GO_Molecular_Function_2018","GO_Cellular_Component_2018","KEGG_2019_Human","Reactome_2016")
 
@@ -98,6 +98,54 @@ server <- function(input, output) {
       return(res)
     }
   }
+  
+  updateResults <- function(pheno, control, case, dds, isDeseq = T){ #Used when the DE data needs to be updated, avoid re-running dds
+    res <- list()
+    dds$phenotypes <- relevel(dds$phenotypes, control)
+    phenotypes <- factor(pheno[[input[[paste0("group_col",1)]]]])
+    cases <- as.vector(unlist(phenotypes[!phenotypes%in%control]))
+    if(isDeseq){
+      for(i in unique(cases)){
+        test <- DESeq2::results(dds,contrast = c("phenotypes",i,control))#Keeping control constant, and comparing with all cases
+        test <- data.frame(test)
+        colnames(test) <- c("baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
+        test <- test[,c("baseMean","log2FoldChange","padj")]
+        if(!exists("de_res")){
+          if(length(unique(cases)) == 1){
+            #colnames(de_res) <- c("baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
+            de_res <- test
+          }
+          if (i == case){
+            de_res <- test
+          }
+          else{
+            de_res <- test
+            colnames(de_res) <- c("baseMean",paste0("log2FoldChange_",i),paste0("padj_",i))
+          }
+        }
+        else {
+          if (i == case){
+            test <- test[,c("log2FoldChange","padj")]
+            de_res <- cbind(de_res, test)
+          }
+          else {#test[,c("baseMean","log2FoldChange","padj")]
+            colnames(test) <- c("baseMean",paste0("log2FoldChange_",i),paste0("padj_",i))
+            test <- test[,c(paste0("log2FoldChange_",i),paste0("padj_",i))]
+            de_res <- cbind(de_res, test)
+          }
+        }
+      }
+      de_res$ensembl_gene_id <- row.names(test)
+      row.names(de_res) <- de_res$ensembl_gene_id #why is this needed?
+      de_res$ensembl_gene_id <- NULL
+      res[["test"]] <- de_res
+      res[["norm_counts"]] <- assay(varianceStabilizingTransformation(dds))
+      res[["dds"]] <- dds
+      res[["phenotypes"]] <- phenotypes
+      return(res)
+    }
+  }
+  
 
   gene_results_de <- reactive({#used to run and store the preliminary DE Analysis, the resulting list also includes normalized counts
     req(input_data$inp)
@@ -133,15 +181,11 @@ server <- function(input, output) {
         }
 
         if(input[[paste0("raw_counts",i)]]&is.null(gene_data$df)){#if the data is raw run DESeq2
-          print("linRNA")
           res[[toString(i)]] <- count2deseq_analysis(input, countdata = counts, pheno = pheno, i = i)
-          print("done")
-          print(head(res[[toString(i)]]))
         }
         else if(input[[paste0("raw_counts",i)]]&!is.null(gene_data$de)){
           res[[toString(i)]] <- updateResults(pheno = pheno, control = control, case = case, dds = gene_data$de)
         }
-        
         else {
           d0 <- DGEList(assays(counts)$counts) #should counts refer to something else?
           if(input$gene_filter){
@@ -432,7 +476,7 @@ server <- function(input, output) {
 
   output$volcano <- renderPlotly({
     req(gene_results_filtered(), eval(parse(text = input$p))<p_max)
-    volcano_plot(input = input, data = gene_results_filtered(), pathway_dic = pathway_dic())})
+    volcano_plot(input = input, data = gene_results_filtered(), pathway_dic = pathway_dic(), max_group = max_group)})
 
   output$volcano_title_circ <- renderUI({
     req(gene_results_filtered_circ())
@@ -452,7 +496,7 @@ server <- function(input, output) {
   output$volcano_c <- renderPlotly({
     req(gene_results_filtered_circ(), eval(parse(text = input$p))<p_max)#,!is.null(input_data$inp[[paste0("circRNA",1)]])
     res <- gene_results_filtered_circ()#volcano_plot(input = input, data = gene_results_filtered(), pathway_dic = pathway_dic())})
-    volcano_plot(input = input, res, pathway_dic = pathway_dic())
+    volcano_plot(input = input, res, pathway_dic = pathway_dic(), max_group = max_group)
   })
 
 
@@ -461,24 +505,49 @@ server <- function(input, output) {
     plotlyOutput("volcano_c",height = "1000px")
   })
 
-  circToLin <- reactive({
-    req(gene_results())
-    a <- gene_results_de()[[paste0("circRNA",1)]][["test"]]
-    d <- gene_results_de()[[paste0("circRNA",1)]][["circ_info"]]
-    d <- cbind(a,d)
-    d <- filter_results(input, d)
-    d <- merge(d,ensembl2id(), by = "ensembl_gene_id")
-    return(d)
-  })
+  # circToLin <- reactive({
+  #   req(gene_results())
+  #   a <- gene_results_de()[[paste0("circRNA",1)]][["test"]]
+  #   d <- gene_results_de()[[paste0("circRNA",1)]][["circ_info"]]
+  #   d <- cbind(a,d)
+  #   d <- filter_results(input, d)
+  #   d <- merge(d,ensembl2id(), by = "ensembl_gene_id")
+  #   return(d)
+  # })
 
   output$circVsL <- renderPlotly({
-    req(circToLin())
-    ggplot(circToLin(), aes(x=log2(sum_lin), y=log2(sum_junction),color=gene_biotype)) + geom_point() + geom_abline(slope = 1)
+    req(gene_results_filtered_circ())
+    data <- gene_results_filtered_circ()
+    keep_vals <- names(table(col_vals)[order(table(col_vals),decreasing = T)][1:max_group])
+    col_text <- col_vals
+    col_vals <- ifelse(col_vals%in%keep_vals, col_vals, "Other")
+    col_nr <- grep(colnames(data),pattern = gsub(input$volcano_col,pattern = "-",replacement = "_"))[1]
+    col_vals <- c(data[,col_nr])
+    g <- ggplot(data, aes(y=log2(sum_lin), x=log2(sum_junction),color=col_vals, gene_symbol = gene_symbol)) + geom_point() + geom_abline(slope = 1)
+    ggplotly(g, tooltip = "gene_symbol")%>%
+      config(
+        toImageButtonOptions = list(
+          format = "svg",
+          filename = "LinToCircRNA.svg",
+          width = 1500,
+          height = 1000
+        )
+      )
   })
 
   output$circVsLin <- renderUI({
     req(gene_results_filtered_circ(), eval(parse(text = input$p))<p_max,!is.null(input_data$inp[[paste0("circRNA",1)]]))
     plotlyOutput("circVsL",height = "1000px")
+  })
+  
+  output$circVsLin_text <- renderUI({
+    req(gene_results_filtered_circ())#,!is.null(input_data$inp[[paste0("circRNA",1)]])
+    s0 <- "Showing circular vs linear proportion for each gene."
+    #s1 <- "The plot can be colored by typing a search term for a given column in one of the text boxes to the left, see (2). You can use .* to indicate wildcards (one or more characters of any type). In the Post Analysis you can run a K-means clustering algorithm, and annotate the plot with the clusters. Only the significant genes are included in the clustering."
+    #s3 <- "You can also export the figure in svg by clicking on the camera symbol in the top right corner. If you click on items in the legend they are removed from view."
+    #s2 <- "You can interact with the plot to zoom in on an area when the zoom option is selected, and you can choose the 'box select'/'lasso select' to select datapoints of interest. This will show details on the specific genes, and a boxplot will be plotted showing normalized gene expressions."
+    
+    HTML(paste("<p>",paste(s0, sep = '<br/>'),"</p>"))
   })
 
   output$pca_title <- renderUI({
@@ -620,9 +689,9 @@ server <- function(input, output) {
     sign_genes <- list()
     temp <- gene_results()[gene_results()$padj < eval(parse(text = input$p)) & !is.na(gene_results()$padj) & abs(gene_results()$log2FoldChange) > log2(input$fc),]
     temp <- temp[order(temp$padj,decreasing = F),]
-    sign_genes$gene_symbol <- temp[,"gene_symbol"]
-    sign_genes$ensembl_gene_id <- temp[,"ensembl_gene_id"]
-    return(sign_genes)
+    #sign_genes$gene_symbol <- temp[,"gene_symbol"]
+    #sign_genes$ensembl_gene_id <- temp[,"ensembl_gene_id"]
+    return(temp)#sign_genes
   })
 
   ##FC cancer comparison heatmap
@@ -1082,7 +1151,11 @@ ui <- fluidPage(
         htmlOutput(outputId = "gene_results_title"),
         dataTableOutput("gene_results_table"),
         htmlOutput(outputId = "gene_results_text"),
-
+        
+        dataTableOutput("gene_results_table_circ"),
+        
+        uiOutput("circVsLin"),
+        
         htmlOutput("FC_data_title_cancer"),
         uiOutput(outputId = 'FC_data_cancer'),
         htmlOutput("FC_data_text_cancer"),
